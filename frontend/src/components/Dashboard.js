@@ -14,18 +14,28 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TextField,
+  MenuItem,
 } from '@mui/material';
 import { Add, EventRepeat } from '@mui/icons-material';
 import { getAllBookings } from '../services/bookingService';
 import { getCurrentWeek } from '../services/rotorService';
+import { getAllClinics } from '../services/clinicService';
 import { format } from 'date-fns';
 
 function Dashboard() {
   const navigate = useNavigate();
   const [todayBookings, setTodayBookings] = useState([]);
   const [upcomingBookings, setUpcomingBookings] = useState([]);
+  const [filteredUpcoming, setFilteredUpcoming] = useState([]);
   const [rotaWeek, setRotaWeek] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [clinics, setClinics] = useState([]);
+  const [filters, setFilters] = useState({
+    date: '',
+    clinic_id: '',
+    specialty: '',
+  });
 
   useEffect(() => {
     loadData();
