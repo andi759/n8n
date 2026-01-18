@@ -26,6 +26,40 @@ app.use('/api/rotor', require('./routes/rotor'));
 app.use('/api/rooms', require('./routes/rooms'));
 app.use('/api/users', require('./routes/users'));
 
+// TEMPORARY: Create first admin user (REMOVE AFTER USING)
+app.post('/api/create-first-admin', async (req, res) => {
+    const db = require('./config/database');
+    const bcrypt = require('bcryptjs');
+
+    try {
+        // Check if any admin exists
+        const existingAdmin = await db.get('SELECT * FROM users WHERE role = ?', ['admin']);
+
+        if (existingAdmin) {
+            return res.status(400).json({ error: 'Admin user already exists. Please remove this route.' });
+        }
+
+        const password_hash = await bcrypt.hash('Admin123!', 10);
+
+        await db.run(`
+            INSERT INTO users (username, password_hash, full_name, email, role)
+            VALUES (?, ?, ?, ?, ?)
+        `, ['admin', password_hash, 'System Administrator', 'admin@example.com', 'admin']);
+
+        res.json({
+            success: true,
+            message: 'Admin user created successfully',
+            credentials: {
+                username: 'admin',
+                password: 'Admin123!'
+            },
+            warning: 'CHANGE THIS PASSWORD IMMEDIATELY AFTER LOGIN! Then remove this route from server.js'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Serve static files from React build in production
 if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, '../frontend/build')));
