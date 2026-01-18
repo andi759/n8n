@@ -27,7 +27,7 @@ app.use('/api/rooms', require('./routes/rooms'));
 app.use('/api/users', require('./routes/users'));
 
 // TEMPORARY: Create first admin user (REMOVE AFTER USING)
-app.post('/api/create-first-admin', async (req, res) => {
+app.get('/api/create-first-admin', async (req, res) => {
     const db = require('./config/database');
     const bcrypt = require('bcryptjs');
 
