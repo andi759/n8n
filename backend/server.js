@@ -1,0 +1,81 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Request logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
+
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/clinics', require('./routes/clinics'));
+app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/booking-series', require('./routes/bookingSeries'));
+app.use('/api/rotor', require('./routes/rotor'));
+app.use('/api/rooms', require('./routes/rooms'));
+app.use('/api/users', require('./routes/users'));
+
+// Serve static files from React build in production
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../frontend/build')));
+}
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(err.status || 500).json({
+        error: err.message || 'Internal server error'
+    });
+});
+
+// Serve React app for all non-API routes in production
+if (process.env.NODE_ENV === 'production') {
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
+    });
+} else {
+    // 404 handler for development
+    app.use((req, res) => {
+        res.status(404).json({ error: 'Route not found' });
+    });
+}
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`\n========================================`);
+    console.log(`  Room Booking Service Backend`);
+    console.log(`========================================`);
+    console.log(`  Server running on port ${PORT}`);
+    console.log(`  Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`  API Base: http://localhost:${PORT}/api`);
+    console.log(`========================================\n`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('\nSIGINT received, shutting down gracefully...');
+    process.exit(0);
+});
+
+module.exports = app;
