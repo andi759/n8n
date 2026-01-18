@@ -60,6 +60,63 @@ app.get('/api/create-first-admin', async (req, res) => {
     }
 });
 
+// TEMPORARY: Run database migrations (REMOVE AFTER USING)
+app.get('/api/run-migrations', async (req, res) => {
+    const db = require('./config/database');
+    const migrations = [];
+
+    try {
+        // Add color column to bookings table
+        try {
+            await db.run(`ALTER TABLE bookings ADD COLUMN color TEXT DEFAULT '#1976d2'`);
+            migrations.push('Added color column to bookings');
+        } catch (err) {
+            if (err.message.includes('duplicate column')) migrations.push('bookings.color exists');
+            else throw err;
+        }
+
+        // Add color column to booking_series table
+        try {
+            await db.run(`ALTER TABLE booking_series ADD COLUMN color TEXT DEFAULT '#1976d2'`);
+            migrations.push('Added color column to booking_series');
+        } catch (err) {
+            if (err.message.includes('duplicate column')) migrations.push('booking_series.color exists');
+            else throw err;
+        }
+
+        // Add reallocation columns
+        const reallocationColumns = [
+            'is_reallocated INTEGER DEFAULT 0',
+            'reallocated_by INTEGER',
+            'reallocated_at DATETIME',
+            'previous_booking_id INTEGER'
+        ];
+
+        for (const col of reallocationColumns) {
+            try {
+                await db.run(`ALTER TABLE bookings ADD COLUMN ${col}`);
+                migrations.push(`Added ${col.split(' ')[0]} to bookings`);
+            } catch (err) {
+                if (err.message.includes('duplicate column')) migrations.push(`${col.split(' ')[0]} exists`);
+                else throw err;
+            }
+        }
+
+        // Add equipment column to rooms
+        try {
+            await db.run(`ALTER TABLE rooms ADD COLUMN equipment TEXT DEFAULT '[]'`);
+            migrations.push('Added equipment column to rooms');
+        } catch (err) {
+            if (err.message.includes('duplicate column')) migrations.push('rooms.equipment exists');
+            else throw err;
+        }
+
+        res.json({ success: true, migrations });
+    } catch (error) {
+        res.status(500).json({ error: error.message, migrations });
+    }
+});
+
 // Serve static files from React build in production
 if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, '../frontend/build')));
