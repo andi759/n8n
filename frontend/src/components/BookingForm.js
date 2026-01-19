@@ -17,12 +17,14 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { createBooking } from '../services/bookingService';
 import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
+import { getAllSpecialties } from '../services/specialtyService';
 import { formatDate } from '../utils/rotorHelper';
 
 function BookingForm() {
   const navigate = useNavigate();
   const [clinics, setClinics] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [specialties, setSpecialties] = useState([]);
   const [formData, setFormData] = useState({
     clinic_id: '',
     room_id: '',
@@ -40,7 +42,33 @@ function BookingForm() {
 
   useEffect(() => {
     loadClinics();
+    loadSpecialties();
   }, []);
+
+  const loadSpecialties = async () => {
+    try {
+      const data = await getAllSpecialties();
+      setSpecialties(data);
+    } catch (error) {
+      console.error('Failed to load specialties:', error);
+    }
+  };
+
+  const handleSpecialtyChange = (specialtyId) => {
+    const selectedSpecialty = specialties.find(s => s.id === parseInt(specialtyId));
+    if (selectedSpecialty) {
+      setFormData(prev => ({
+        ...prev,
+        specialty: selectedSpecialty.name,
+        color: selectedSpecialty.color,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        specialty: '',
+      }));
+    }
+  };
 
   useEffect(() => {
     if (formData.clinic_id) {
@@ -198,12 +226,31 @@ function BookingForm() {
 
               <Grid item xs={12} md={6}>
                 <TextField
+                  select
                   label="Specialty"
                   fullWidth
-                  value={formData.specialty}
-                  onChange={(e) => handleChange('specialty', e.target.value)}
-                  placeholder="e.g., Cardiology, Neurology"
-                />
+                  value={specialties.find(s => s.name === formData.specialty)?.id || ''}
+                  onChange={(e) => handleSpecialtyChange(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>Select Specialty</em>
+                  </MenuItem>
+                  {specialties.map((specialty) => (
+                    <MenuItem key={specialty.id} value={specialty.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: '2px',
+                            backgroundColor: specialty.color,
+                          }}
+                        />
+                        {specialty.name}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Grid>
 
               <Grid item xs={12} md={6}>

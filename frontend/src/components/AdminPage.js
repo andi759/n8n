@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import RoomManagement from './admin/RoomManagement';
 import UserManagement from './admin/UserManagement';
+import SpecialtyManagement from './admin/SpecialtyManagement';
 import RotaConfiguration from './admin/RotorConfiguration';
 
 function TabPanel({ children, value, index }) {
@@ -47,6 +48,7 @@ function AdminPage() {
         >
           <Tab label="Room Management" />
           <Tab label="User Management" />
+          <Tab label="Specialties" />
           <Tab label="Rota Configuration" />
         </Tabs>
 
@@ -59,6 +61,10 @@ function AdminPage() {
         </TabPanel>
 
         <TabPanel value={activeTab} index={2}>
+          <SpecialtyManagement />
+        </TabPanel>
+
+        <TabPanel value={activeTab} index={3}>
           <RotaConfiguration />
         </TabPanel>
       </Paper>

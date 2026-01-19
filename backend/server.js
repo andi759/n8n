@@ -25,6 +25,7 @@ app.use('/api/booking-series', require('./routes/bookingSeries'));
 app.use('/api/rotor', require('./routes/rotor'));
 app.use('/api/rooms', require('./routes/rooms'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/specialties', require('./routes/specialties'));
 
 // TEMPORARY: Create first admin user (REMOVE AFTER USING)
 app.get('/api/create-first-admin', async (req, res) => {
@@ -109,6 +110,42 @@ app.get('/api/run-migrations', async (req, res) => {
         } catch (err) {
             if (err.message.includes('duplicate column')) migrations.push('rooms.equipment exists');
             else throw err;
+        }
+
+        // Create specialties table
+        try {
+            await db.run(`
+                CREATE TABLE IF NOT EXISTS specialties (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE NOT NULL,
+                    color TEXT DEFAULT '#1976d2',
+                    is_active INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            migrations.push('Created specialties table');
+
+            // Insert default specialties
+            const defaultSpecialties = [
+                ['Cardiology', '#e53935'],
+                ['Dermatology', '#8e24aa'],
+                ['ENT', '#43a047'],
+                ['Neurology', '#fb8c00'],
+                ['Ophthalmology', '#1e88e5']
+            ];
+
+            for (const [name, color] of defaultSpecialties) {
+                try {
+                    await db.run(`INSERT INTO specialties (name, color) VALUES (?, ?)`, [name, color]);
+                    migrations.push(`Added specialty: ${name}`);
+                } catch (err) {
+                    if (err.message.includes('UNIQUE constraint')) {
+                        migrations.push(`Specialty ${name} already exists`);
+                    }
+                }
+            }
+        } catch (err) {
+            migrations.push('Specialties table error: ' + err.message);
         }
 
         res.json({ success: true, migrations });
