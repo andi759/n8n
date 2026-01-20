@@ -5,93 +5,77 @@ async function runMigrations() {
     const migrations = [];
 
     try {
+        // PostgreSQL uses different syntax for ALTER TABLE
+        // These are kept for backwards compatibility, but the schema_postgres.sql
+        // should already have all columns defined
+
         // Add color column to bookings table
         try {
-            await db.run(`ALTER TABLE bookings ADD COLUMN color TEXT DEFAULT '#1976d2'`);
-            migrations.push('Added color column to bookings');
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS color VARCHAR(50) DEFAULT '#1976d2'`);
+            migrations.push('Checked color column on bookings');
         } catch (err) {
-            if (err.message.includes('duplicate column')) {
-                // Column already exists, that's fine
-            } else {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
                 console.error('Migration error (bookings.color):', err.message);
             }
         }
 
         // Add color column to booking_series table
         try {
-            await db.run(`ALTER TABLE booking_series ADD COLUMN color TEXT DEFAULT '#1976d2'`);
-            migrations.push('Added color column to booking_series');
+            await db.exec(`ALTER TABLE booking_series ADD COLUMN IF NOT EXISTS color VARCHAR(50) DEFAULT '#1976d2'`);
+            migrations.push('Checked color column on booking_series');
         } catch (err) {
-            if (!err.message.includes('duplicate column')) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
                 console.error('Migration error (booking_series.color):', err.message);
-            }
-        }
-
-        // Add reallocation columns
-        const reallocationColumns = [
-            'is_reallocated INTEGER DEFAULT 0',
-            'reallocated_by INTEGER',
-            'reallocated_at DATETIME',
-            'previous_booking_id INTEGER'
-        ];
-
-        for (const col of reallocationColumns) {
-            try {
-                await db.run(`ALTER TABLE bookings ADD COLUMN ${col}`);
-                migrations.push(`Added ${col.split(' ')[0]} to bookings`);
-            } catch (err) {
-                if (!err.message.includes('duplicate column')) {
-                    console.error(`Migration error (bookings.${col.split(' ')[0]}):`, err.message);
-                }
-            }
-        }
-
-        // Add equipment column to rooms
-        try {
-            await db.run(`ALTER TABLE rooms ADD COLUMN equipment TEXT DEFAULT '[]'`);
-            migrations.push('Added equipment column to rooms');
-        } catch (err) {
-            if (!err.message.includes('duplicate column')) {
-                console.error('Migration error (rooms.equipment):', err.message);
             }
         }
 
         // Add doctor_name column to bookings table
         try {
-            await db.run(`ALTER TABLE bookings ADD COLUMN doctor_name TEXT`);
-            migrations.push('Added doctor_name column to bookings');
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS doctor_name VARCHAR(255)`);
+            migrations.push('Checked doctor_name column on bookings');
         } catch (err) {
-            if (!err.message.includes('duplicate column')) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
                 console.error('Migration error (bookings.doctor_name):', err.message);
             }
         }
 
         // Add doctor_name column to booking_series table
         try {
-            await db.run(`ALTER TABLE booking_series ADD COLUMN doctor_name TEXT`);
-            migrations.push('Added doctor_name column to booking_series');
+            await db.exec(`ALTER TABLE booking_series ADD COLUMN IF NOT EXISTS doctor_name VARCHAR(255)`);
+            migrations.push('Checked doctor_name column on booking_series');
         } catch (err) {
-            if (!err.message.includes('duplicate column')) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
                 console.error('Migration error (booking_series.doctor_name):', err.message);
             }
         }
 
-        // Create specialties table
+        // Add reallocation columns
         try {
-            await db.run(`
-                CREATE TABLE IF NOT EXISTS specialties (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL,
-                    color TEXT DEFAULT '#1976d2',
-                    is_active INTEGER DEFAULT 1,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            `);
-            migrations.push('Created specialties table');
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_reallocated INTEGER DEFAULT 0`);
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reallocated_by INTEGER`);
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reallocated_at TIMESTAMP`);
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS previous_booking_id INTEGER`);
+            migrations.push('Checked reallocation columns on bookings');
+        } catch (err) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+                console.error('Migration error (reallocation columns):', err.message);
+            }
+        }
 
-            // Insert default specialties if table is empty
+        // Add equipment column to rooms
+        try {
+            await db.exec(`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS equipment TEXT DEFAULT '[]'`);
+            migrations.push('Checked equipment column on rooms');
+        } catch (err) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+                console.error('Migration error (rooms.equipment):', err.message);
+            }
+        }
+
+        // Insert default specialties if table is empty
+        try {
             const count = await db.get('SELECT COUNT(*) as count FROM specialties');
-            if (count.count === 0) {
+            if (count && count.count === 0) {
                 const defaultSpecialties = [
                     ['Cardiology', '#e53935'],
                     ['Dermatology', '#8e24aa'],
@@ -102,7 +86,7 @@ async function runMigrations() {
 
                 for (const [name, color] of defaultSpecialties) {
                     try {
-                        await db.run(`INSERT INTO specialties (name, color) VALUES (?, ?)`, [name, color]);
+                        await db.run(`INSERT INTO specialties (name, color) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`, [name, color]);
                         migrations.push(`Added specialty: ${name}`);
                     } catch (err) {
                         // Ignore duplicate errors
