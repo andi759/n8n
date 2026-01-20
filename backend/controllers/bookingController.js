@@ -109,6 +109,7 @@ async function createBooking(req, res) {
             duration_minutes,
             specialty,
             clinic_code,
+            doctor_name,
             notes,
             color
         } = req.body;
@@ -169,12 +170,12 @@ async function createBooking(req, res) {
         const result = await db.run(`
             INSERT INTO bookings (
                 clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
-                specialty, clinic_code, notes, color, created_by,
+                specialty, clinic_code, doctor_name, notes, color, created_by,
                 is_reallocated, previous_booking_id, reallocated_by, reallocated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             clinic_id, room_id, booking_date, start_time, end_time, duration_minutes || 60,
-            specialty, clinic_code, notes, color || '#1976d2', req.user.id,
+            specialty, clinic_code, doctor_name, notes, color || '#1976d2', req.user.id,
             isReallocated, previousBookingId, reallocatedBy, reallocatedAt
         ]);
 
@@ -201,6 +202,7 @@ async function updateBooking(req, res) {
             duration_minutes,
             specialty,
             clinic_code,
+            doctor_name,
             notes,
             status,
             color
@@ -248,6 +250,7 @@ async function updateBooking(req, res) {
                 duration_minutes = COALESCE(?, duration_minutes),
                 specialty = COALESCE(?, specialty),
                 clinic_code = COALESCE(?, clinic_code),
+                doctor_name = COALESCE(?, doctor_name),
                 notes = COALESCE(?, notes),
                 status = COALESCE(?, status),
                 color = COALESCE(?, color),
@@ -256,7 +259,7 @@ async function updateBooking(req, res) {
             WHERE id = ?
         `, [
             clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
-            specialty, clinic_code, notes, status, color, isException, id
+            specialty, clinic_code, doctor_name, notes, status, color, isException, id
         ]);
 
         const booking = await db.get('SELECT * FROM bookings WHERE id = ?', [id]);

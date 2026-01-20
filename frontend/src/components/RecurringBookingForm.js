@@ -36,6 +36,7 @@ function RecurringBookingForm() {
     end_time: '10:00',
     specialty: '',
     clinic_code: '',
+    doctor_name: '',
     notes: '',
     color: '#1976d2',
     recurrence_type: 'weekly',
@@ -304,6 +305,16 @@ function RecurringBookingForm() {
                 value={formData.clinic_code}
                 onChange={(e) => handleChange('clinic_code', e.target.value)}
                 placeholder="e.g., Department or service code"
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Doctor Name"
+                fullWidth
+                value={formData.doctor_name}
+                onChange={(e) => handleChange('doctor_name', e.target.value)}
+                placeholder="e.g., Dr. Smith"
               />
             </Grid>
 

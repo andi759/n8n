@@ -51,6 +51,7 @@ function generateBookingInstances(series, rangeStart, rangeEnd, rotorCycleStart)
         duration_minutes: series.duration_minutes,
         specialty: series.specialty,
         clinic_code: series.clinic_code,
+        doctor_name: series.doctor_name,
         notes: series.notes,
         color: series.color || '#1976d2',
         status: 'confirmed',

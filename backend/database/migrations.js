@@ -56,6 +56,26 @@ async function runMigrations() {
             }
         }
 
+        // Add doctor_name column to bookings table
+        try {
+            await db.run(`ALTER TABLE bookings ADD COLUMN doctor_name TEXT`);
+            migrations.push('Added doctor_name column to bookings');
+        } catch (err) {
+            if (!err.message.includes('duplicate column')) {
+                console.error('Migration error (bookings.doctor_name):', err.message);
+            }
+        }
+
+        // Add doctor_name column to booking_series table
+        try {
+            await db.run(`ALTER TABLE booking_series ADD COLUMN doctor_name TEXT`);
+            migrations.push('Added doctor_name column to booking_series');
+        } catch (err) {
+            if (!err.message.includes('duplicate column')) {
+                console.error('Migration error (booking_series.doctor_name):', err.message);
+            }
+        }
+
         // Create specialties table
         try {
             await db.run(`

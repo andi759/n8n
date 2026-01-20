@@ -274,6 +274,7 @@ function BookingList() {
                 <TableCell>Clinic</TableCell>
                 <TableCell>Room</TableCell>
                 <TableCell>Specialty</TableCell>
+                <TableCell>Doctor</TableCell>
                 <TableCell>Clinic Code</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Reallocated</TableCell>
@@ -305,6 +306,7 @@ function BookingList() {
                     <TableCell>{booking.clinic_name}</TableCell>
                     <TableCell>{booking.room_name}</TableCell>
                     <TableCell>{booking.specialty || '-'}</TableCell>
+                    <TableCell>{booking.doctor_name || '-'}</TableCell>
                     <TableCell>{booking.clinic_code || '-'}</TableCell>
                     <TableCell>
                       <Chip

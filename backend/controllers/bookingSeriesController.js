@@ -120,6 +120,7 @@ async function createSeries(req, res) {
             duration_minutes,
             specialty,
             clinic_code,
+            doctor_name,
             notes,
             color,
             recurrence_type,
@@ -137,12 +138,12 @@ async function createSeries(req, res) {
         const seriesResult = await db.run(`
             INSERT INTO booking_series (
                 clinic_id, room_id, series_name, start_time, end_time, duration_minutes,
-                specialty, clinic_code, notes, color, recurrence_type, recurrence_pattern,
+                specialty, clinic_code, doctor_name, notes, color, recurrence_type, recurrence_pattern,
                 series_start_date, series_end_date, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             clinic_id, room_id, series_name, start_time, end_time, duration_minutes || 60,
-            specialty, clinic_code, notes, color || '#1976d2', recurrence_type,
+            specialty, clinic_code, doctor_name, notes, color || '#1976d2', recurrence_type,
             JSON.stringify(recurrence_pattern), series_start_date, series_end_date,
             req.user.id
         ]);
@@ -162,13 +163,13 @@ async function createSeries(req, res) {
             db.run(`
                 INSERT INTO bookings (
                     series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
-                    specialty, clinic_code, notes, color, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    specialty, clinic_code, doctor_name, notes, color, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 instance.series_id, instance.clinic_id, instance.room_id, instance.booking_date,
                 instance.start_time, instance.end_time, instance.duration_minutes,
-                instance.specialty, instance.clinic_code, instance.notes,
-                instance.color || series.color || '#1976d2',
+                instance.specialty, instance.clinic_code, instance.doctor_name,
+                instance.notes, instance.color || series.color || '#1976d2',
                 instance.created_by
             ])
         );
@@ -205,7 +206,7 @@ async function updateSeries(req, res) {
         const updateParams = [];
 
         ['room_id', 'series_name', 'start_time', 'end_time', 'duration_minutes',
-         'specialty', 'clinic_code', 'notes', 'color', 'series_end_date'].forEach(field => {
+         'specialty', 'clinic_code', 'doctor_name', 'notes', 'color', 'series_end_date'].forEach(field => {
             if (updates[field] !== undefined) {
                 updateFields.push(`${field} = ?`);
                 updateParams.push(updates[field]);
