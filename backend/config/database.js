@@ -32,13 +32,19 @@ class Database {
     async run(sql, params = []) {
         try {
             // Convert ? placeholders to $1, $2, etc. for PostgreSQL
-            const pgSql = this.convertPlaceholders(sql);
+            let pgSql = this.convertPlaceholders(sql);
+
+            // For INSERT queries, add RETURNING id to get the inserted ID
+            if (sql.trim().toUpperCase().startsWith('INSERT') && !pgSql.toUpperCase().includes('RETURNING')) {
+                pgSql = pgSql.replace(/;?\s*$/, ' RETURNING id');
+            }
+
             const result = await this.pool.query(pgSql, params);
 
-            // For INSERT queries, try to get the inserted ID
+            // For INSERT queries, return the inserted ID
             if (sql.trim().toUpperCase().startsWith('INSERT')) {
                 return {
-                    id: result.rows[0]?.id || result.rowCount,
+                    id: result.rows[0]?.id || null,
                     changes: result.rowCount
                 };
             }

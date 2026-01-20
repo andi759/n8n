@@ -151,8 +151,18 @@ async function createSeries(req, res) {
 
         const seriesId = seriesResult.id;
 
+        if (!seriesId) {
+            console.error('Failed to get series ID from insert result:', seriesResult);
+            return res.status(500).json({ error: 'Failed to create booking series - no ID returned' });
+        }
+
         // Get the created series
         const series = await db.get('SELECT * FROM booking_series WHERE id = ?', [seriesId]);
+
+        if (!series) {
+            console.error('Series not found after insert. ID:', seriesId);
+            return res.status(500).json({ error: 'Failed to retrieve created booking series' });
+        }
 
         // Generate instances
         const rotorCycleStart = await getRotorCycleStart();
