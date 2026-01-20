@@ -16,10 +16,16 @@ import {
   Button,
   Chip,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
 } from '@mui/material';
 import { Delete, Refresh } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { getAllBookings, deleteBooking } from '../services/bookingService';
+import { deleteSeries } from '../services/seriesService';
 import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
 import { format } from 'date-fns';
@@ -41,6 +47,8 @@ function BookingList() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bookingToDelete, setBookingToDelete] = useState(null);
 
   useEffect(() => {
     loadClinics();
@@ -105,15 +113,40 @@ function BookingList() {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to cancel this booking?')) {
+  const handleDeleteClick = (booking) => {
+    setBookingToDelete(booking);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteSingle = async () => {
+    if (bookingToDelete) {
       try {
-        await deleteBooking(id);
+        await deleteBooking(bookingToDelete.id);
         loadBookings();
       } catch (error) {
         console.error('Failed to delete booking:', error);
       }
     }
+    setDeleteDialogOpen(false);
+    setBookingToDelete(null);
+  };
+
+  const handleDeleteSeries = async () => {
+    if (bookingToDelete && bookingToDelete.series_id) {
+      try {
+        await deleteSeries(bookingToDelete.series_id);
+        loadBookings();
+      } catch (error) {
+        console.error('Failed to delete series:', error);
+      }
+    }
+    setDeleteDialogOpen(false);
+    setBookingToDelete(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setBookingToDelete(null);
   };
 
   const getStatusColor = (status) => {
@@ -302,7 +335,7 @@ function BookingList() {
                       <IconButton
                         size="small"
                         title="Cancel"
-                        onClick={() => handleDelete(booking.id)}
+                        onClick={() => handleDeleteClick(booking)}
                         disabled={booking.status === 'cancelled'}
                       >
                         <Delete fontSize="small" />
@@ -326,6 +359,54 @@ function BookingList() {
           />
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Cancel Booking</DialogTitle>
+        <DialogContent>
+          {bookingToDelete && (
+            <Box>
+              <Typography sx={{ mb: 2 }}>
+                Are you sure you want to cancel this booking?
+              </Typography>
+              <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 2 }}>
+                <Typography variant="body2">
+                  <strong>Date:</strong> {bookingToDelete.booking_date}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Time:</strong> {bookingToDelete.start_time} - {bookingToDelete.end_time}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Room:</strong> {bookingToDelete.room_name}
+                </Typography>
+                {bookingToDelete.specialty && (
+                  <Typography variant="body2">
+                    <strong>Specialty:</strong> {bookingToDelete.specialty}
+                  </Typography>
+                )}
+              </Box>
+              {bookingToDelete.series_id && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  This booking is part of a recurring series. You can cancel just this single booking, or cancel the entire series.
+                </Alert>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>
+            Keep Booking
+          </Button>
+          {bookingToDelete?.series_id && (
+            <Button onClick={handleDeleteSeries} color="error" variant="outlined">
+              Cancel Entire Series
+            </Button>
+          )}
+          <Button onClick={handleDeleteSingle} color="error" variant="contained">
+            {bookingToDelete?.series_id ? 'Cancel This Booking Only' : 'Cancel Booking'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
