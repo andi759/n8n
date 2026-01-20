@@ -126,7 +126,8 @@ async function createSeries(req, res) {
             recurrence_type,
             recurrence_pattern,
             series_start_date,
-            series_end_date
+            series_end_date,
+            excluded_dates = []  // Array of dates to skip (e.g., conflicts or user-excluded)
         } = req.body;
 
         // Validate required fields
@@ -156,10 +157,16 @@ async function createSeries(req, res) {
         // Generate instances
         const rotorCycleStart = await getRotorCycleStart();
         const rangeEnd = series_end_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const instances = generateBookingInstances(series, series_start_date, rangeEnd, rotorCycleStart);
+        let instances = generateBookingInstances(series, series_start_date, rangeEnd, rotorCycleStart);
 
-        // Insert instances
-        const insertPromises = instances.map(instance =>
+        // Filter out excluded dates (conflicts or user-excluded)
+        const excludedSet = new Set(excluded_dates);
+        const filteredInstances = instances.filter(
+            instance => !excludedSet.has(instance.booking_date)
+        );
+
+        // Insert only non-excluded instances
+        const insertPromises = filteredInstances.map(instance =>
             db.run(`
                 INSERT INTO bookings (
                     series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
@@ -179,7 +186,8 @@ async function createSeries(req, res) {
         res.status(201).json({
             message: 'Series created successfully',
             series,
-            instance_count: instances.length
+            instance_count: filteredInstances.length,
+            skipped_count: instances.length - filteredInstances.length
         });
     } catch (error) {
         console.error('Create series error:', error);

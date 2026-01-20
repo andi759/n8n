@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -15,16 +15,54 @@ import {
   Alert,
   Chip,
   CircularProgress,
+  Checkbox,
 } from '@mui/material';
 import { Warning, CheckCircle } from '@mui/icons-material';
 import { format } from 'date-fns';
 
 function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
+  const [excludedDates, setExcludedDates] = useState(new Set());
+
+  // Reset excluded dates when preview data changes
+  useEffect(() => {
+    if (previewData?.conflicts) {
+      // Auto-exclude conflicting dates
+      const conflictDates = new Set(
+        previewData.conflicts.map(c => c.instance.booking_date)
+      );
+      setExcludedDates(conflictDates);
+    }
+  }, [previewData]);
+
   if (!previewData) return null;
 
   const { instances, conflicts, total_count, conflict_count } = previewData;
 
   const hasConflicts = conflict_count > 0;
+
+  // Calculate how many will actually be booked
+  const bookableCount = instances.filter(
+    inst => !excludedDates.has(inst.booking_date)
+  ).length;
+
+  const toggleDateExclusion = (date) => {
+    const newExcluded = new Set(excludedDates);
+    if (newExcluded.has(date)) {
+      newExcluded.delete(date);
+    } else {
+      newExcluded.add(date);
+    }
+    setExcludedDates(newExcluded);
+  };
+
+  const handleConfirm = () => {
+    // Pass the list of dates to exclude to the parent
+    onConfirm(Array.from(excludedDates));
+  };
+
+  const isConflicting = (date) => {
+    return conflicts.some(c => c.instance.booking_date === date);
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -35,18 +73,26 @@ function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
       <DialogContent>
         <Box sx={{ mb: 3 }}>
           <Typography variant="body1" gutterBottom>
-            <strong>{total_count}</strong> booking instances will be created
+            <strong>{total_count}</strong> booking instances generated
           </Typography>
 
           {hasConflicts ? (
-            <Alert severity="error" icon={<Warning />} sx={{ mt: 2 }}>
+            <Alert severity="warning" icon={<Warning />} sx={{ mt: 2 }}>
               <strong>{conflict_count} conflicts detected!</strong>
               <br />
-              Some instances overlap with existing bookings.
+              Conflicting dates are automatically excluded. You can proceed with the {bookableCount} available slots,
+              or uncheck dates you want to skip.
             </Alert>
           ) : (
             <Alert severity="success" icon={<CheckCircle />} sx={{ mt: 2 }}>
               No conflicts detected. All time slots are available.
+            </Alert>
+          )}
+
+          {bookableCount < total_count && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <strong>{bookableCount}</strong> of {total_count} bookings will be created
+              ({total_count - bookableCount} excluded)
             </Alert>
           )}
         </Box>
@@ -55,6 +101,7 @@ function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">Include</TableCell>
                 <TableCell>#</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Day</TableCell>
@@ -67,18 +114,29 @@ function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
                 const instanceDate = new Date(instance.booking_date);
                 const dayName = format(instanceDate, 'EEEE');
                 const formattedDate = format(instanceDate, 'MMM dd, yyyy');
-
-                const hasConflict = conflicts.some(
-                  c => c.instance.booking_date === instance.booking_date
-                );
+                const hasConflict = isConflicting(instance.booking_date);
+                const isExcluded = excludedDates.has(instance.booking_date);
 
                 return (
                   <TableRow
                     key={index}
                     sx={{
-                      bgcolor: hasConflict ? 'error.light' : 'transparent',
+                      bgcolor: hasConflict
+                        ? 'error.light'
+                        : isExcluded
+                          ? 'action.disabledBackground'
+                          : 'transparent',
+                      opacity: isExcluded ? 0.6 : 1,
                     }}
                   >
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={!isExcluded}
+                        onChange={() => toggleDateExclusion(instance.booking_date)}
+                        disabled={hasConflict}
+                        size="small"
+                      />
+                    </TableCell>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{formattedDate}</TableCell>
                     <TableCell>{dayName}</TableCell>
@@ -88,14 +146,20 @@ function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
                     <TableCell>
                       {hasConflict ? (
                         <Chip
-                          label="Conflict"
+                          label="Conflict - Skipped"
                           color="error"
                           size="small"
                           icon={<Warning />}
                         />
+                      ) : isExcluded ? (
+                        <Chip
+                          label="Excluded"
+                          color="default"
+                          size="small"
+                        />
                       ) : (
                         <Chip
-                          label="Available"
+                          label="Will Book"
                           color="success"
                           size="small"
                         />
@@ -123,6 +187,9 @@ function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
               <Alert severity="warning" key={index} sx={{ mt: 1 }}>
                 {format(new Date(conflict.instance.booking_date), 'MMM dd, yyyy')} at{' '}
                 {conflict.instance.start_time} - Already booked
+                {conflict.conflicting_bookings?.[0]?.room_name && (
+                  <> in {conflict.conflicting_bookings[0].room_name}</>
+                )}
               </Alert>
             ))}
             {conflicts.length > 5 && (
@@ -134,18 +201,25 @@ function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
         )}
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={loading}>
           Cancel
         </Button>
-        <Button
-          onClick={onConfirm}
-          variant="contained"
-          disabled={loading || hasConflicts}
-          startIcon={loading && <CircularProgress size={20} />}
-        >
-          {loading ? 'Creating...' : 'Confirm & Create Series'}
-        </Button>
+        <Box>
+          <Button
+            onClick={handleConfirm}
+            variant="contained"
+            disabled={loading || bookableCount === 0}
+            startIcon={loading && <CircularProgress size={20} />}
+          >
+            {loading
+              ? 'Creating...'
+              : bookableCount === total_count
+                ? `Create All ${total_count} Bookings`
+                : `Create ${bookableCount} Bookings (Skip ${total_count - bookableCount})`
+            }
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );

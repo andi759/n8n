@@ -156,7 +156,7 @@ function RecurringBookingForm() {
     }
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (excludedDates = []) => {
     setLoading(true);
     setError('');
 
@@ -168,6 +168,7 @@ function RecurringBookingForm() {
         series_start_date: formatDate(formData.series_start_date),
         series_end_date: formData.series_end_date ? formatDate(formData.series_end_date) : null,
         duration_minutes: duration,
+        excluded_dates: excludedDates,  // Pass excluded dates to backend
       };
 
       await createSeries(seriesData);
