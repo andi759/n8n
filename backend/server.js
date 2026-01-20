@@ -69,6 +69,26 @@ app.get('/api/create-first-admin', async (req, res) => {
     }
 });
 
+// TEMPORARY: Clear all bookings from database (REMOVE AFTER USING)
+app.get('/api/clear-all-bookings', async (req, res) => {
+    const db = require('./config/database');
+
+    try {
+        // Delete all bookings
+        await db.run('DELETE FROM bookings');
+        // Delete all booking series
+        await db.run('DELETE FROM booking_series');
+
+        res.json({
+            success: true,
+            message: 'All bookings and booking series have been cleared from the database'
+        });
+    } catch (error) {
+        console.error('Clear bookings error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // TEMPORARY: Run database migrations (REMOVE AFTER USING)
 app.get('/api/run-migrations', async (req, res) => {
     const db = require('./config/database');

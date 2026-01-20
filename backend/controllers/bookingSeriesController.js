@@ -160,10 +160,15 @@ async function createSeries(req, res) {
         let instances = generateBookingInstances(series, series_start_date, rangeEnd, rotorCycleStart);
 
         // Filter out excluded dates (conflicts or user-excluded)
-        const excludedSet = new Set(excluded_dates);
+        // Normalize dates to YYYY-MM-DD format for consistent comparison
+        const excludedSet = new Set(excluded_dates.map(d => String(d).substring(0, 10)));
         const filteredInstances = instances.filter(
-            instance => !excludedSet.has(instance.booking_date)
+            instance => !excludedSet.has(String(instance.booking_date).substring(0, 10))
         );
+
+        console.log('Excluded dates:', Array.from(excludedSet));
+        console.log('Total instances:', instances.length);
+        console.log('Filtered instances (to be created):', filteredInstances.length);
 
         // Insert only non-excluded instances
         const insertPromises = filteredInstances.map(instance =>

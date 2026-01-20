@@ -40,15 +40,15 @@ function generateBookingInstances(series, rangeStart, rangeEnd, rotorCycleStart)
             throw new Error(`Unsupported recurrence type: ${series.recurrence_type}`);
     }
 
-    // Create booking instances
+    // Create booking instances - ensure IDs are integers
     const instances = dates.map(date => ({
         series_id: series.id,
-        clinic_id: series.clinic_id,
-        room_id: series.room_id,
+        clinic_id: parseInt(series.clinic_id, 10),
+        room_id: parseInt(series.room_id, 10),
         booking_date: formatDate(date),
         start_time: series.start_time,
         end_time: series.end_time,
-        duration_minutes: series.duration_minutes,
+        duration_minutes: parseInt(series.duration_minutes, 10) || 60,
         specialty: series.specialty,
         clinic_code: series.clinic_code,
         doctor_name: series.doctor_name,
@@ -187,13 +187,18 @@ async function checkConflicts(instances, db) {
     const conflicts = [];
 
     for (const instance of instances) {
+        // Ensure room_id is an integer for proper comparison
+        const roomId = parseInt(instance.room_id, 10);
+        // Ensure booking_date is a clean string format (YYYY-MM-DD)
+        const bookingDate = String(instance.booking_date).substring(0, 10);
+
         const query = `
             SELECT b.*, r.room_name
             FROM bookings b
             JOIN rooms r ON b.room_id = r.id
             WHERE b.room_id = ?
             AND b.booking_date = ?
-            AND b.status != 'cancelled'
+            AND (b.status IS NULL OR b.status != 'cancelled')
             AND (
                 (b.start_time < ? AND b.end_time > ?)
                 OR (b.start_time >= ? AND b.start_time < ?)
@@ -201,8 +206,8 @@ async function checkConflicts(instances, db) {
         `;
 
         const existingBookings = await db.all(query, [
-            instance.room_id,
-            instance.booking_date,
+            roomId,
+            bookingDate,
             instance.end_time,
             instance.start_time,
             instance.start_time,
@@ -211,7 +216,7 @@ async function checkConflicts(instances, db) {
 
         if (existingBookings.length > 0) {
             conflicts.push({
-                instance: instance,
+                instance: { ...instance, booking_date: bookingDate },
                 conflicting_bookings: existingBookings
             });
         }
