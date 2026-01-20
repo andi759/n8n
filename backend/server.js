@@ -6,6 +6,14 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Run database migrations on startup
+const { runMigrations } = require('./database/migrations');
+runMigrations().then(() => {
+    console.log('Database migrations check complete');
+}).catch(err => {
+    console.error('Migration error:', err);
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
