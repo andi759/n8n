@@ -14,6 +14,7 @@ import {
 import {
   AccountCircle,
   CalendarToday,
+  CalendarMonth,
   EventRepeat,
   ViewList,
   Settings,
@@ -56,6 +57,7 @@ function Navigation() {
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: <CalendarToday /> },
+    { label: 'Calendar', path: '/calendar', icon: <CalendarMonth /> },
     { label: 'New Booking', path: '/new-booking', icon: <CalendarToday /> },
     { label: 'New Recurring', path: '/new-recurring', icon: <EventRepeat /> },
     { label: 'View Bookings', path: '/bookings', icon: <ViewList /> },

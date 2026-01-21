@@ -11,6 +11,7 @@ import Navigation from './components/Navigation';
 import BookingForm from './components/BookingForm';
 import RecurringBookingForm from './components/RecurringBookingForm';
 import BookingList from './components/BookingList';
+import CalendarView from './components/CalendarView';
 import AdminPage from './components/AdminPage';
 
 const theme = createTheme({
@@ -97,6 +98,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <BookingList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute>
+                  <CalendarView />
                 </ProtectedRoute>
               }
             />
