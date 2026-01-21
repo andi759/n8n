@@ -12,6 +12,9 @@ import {
   Box,
   Alert,
   Snackbar,
+  FormControlLabel,
+  Checkbox,
+  FormGroup,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { createBooking } from '../services/bookingService';
@@ -19,6 +22,12 @@ import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
 import { getAllSpecialties } from '../services/specialtyService';
 import { formatDate } from '../utils/rotorHelper';
+
+const SESSION_OPTIONS = [
+  { value: 'all_day', label: 'All Day' },
+  { value: 'am', label: 'AM' },
+  { value: 'pm', label: 'PM' },
+];
 
 function BookingForm() {
   const navigate = useNavigate();
@@ -29,13 +38,16 @@ function BookingForm() {
     clinic_id: '',
     room_id: '',
     booking_date: new Date(),
-    start_time: '09:00',
-    end_time: '10:00',
+    session: 'all_day',
     specialty: '',
     clinic_code: '',
     doctor_name: '',
     notes: '',
     color: '#1976d2',
+    is_ad_hoc: false,
+    is_room_swap: false,
+    is_over_4_weeks: false,
+    is_under_4_weeks: false,
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -102,10 +114,8 @@ function BookingForm() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const calculateDuration = () => {
-    const [startHour, startMin] = formData.start_time.split(':').map(Number);
-    const [endHour, endMin] = formData.end_time.split(':').map(Number);
-    return (endHour * 60 + endMin) - (startHour * 60 + startMin);
+  const handleCheckboxChange = (field) => (event) => {
+    setFormData(prev => ({ ...prev, [field]: event.target.checked }));
   };
 
   const handleSubmit = async (e) => {
@@ -114,18 +124,9 @@ function BookingForm() {
     setLoading(true);
 
     try {
-      const duration = calculateDuration();
-
-      if (duration <= 0) {
-        setError('End time must be after start time');
-        setLoading(false);
-        return;
-      }
-
       const bookingData = {
         ...formData,
         booking_date: formatDate(formData.booking_date),
-        duration_minutes: duration,
       };
 
       await createBooking(bookingData);
@@ -148,7 +149,7 @@ function BookingForm() {
           Create One-Time Booking
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Book a room for a single date and time
+          Book a room for a single date
         </Typography>
       </Box>
 
@@ -192,37 +193,31 @@ function BookingForm() {
                 </TextField>
               </Grid>
 
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <DatePicker
                   label="Booking Date"
                   value={formData.booking_date}
                   onChange={(newDate) => handleChange('booking_date', newDate)}
+                  format="dd/MM/yyyy"
                   slotProps={{ textField: { fullWidth: true, required: true } }}
                 />
               </Grid>
 
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <TextField
-                  label="Start Time"
-                  type="time"
+                  select
+                  label="Session"
                   fullWidth
                   required
-                  value={formData.start_time}
-                  onChange={(e) => handleChange('start_time', e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="End Time"
-                  type="time"
-                  fullWidth
-                  required
-                  value={formData.end_time}
-                  onChange={(e) => handleChange('end_time', e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
+                  value={formData.session}
+                  onChange={(e) => handleChange('session', e.target.value)}
+                >
+                  {SESSION_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Grid>
 
               <Grid item xs={12} md={6}>
@@ -301,6 +296,50 @@ function BookingForm() {
                     />
                   </Box>
                 </Box>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Booking Type (for reporting)
+                </Typography>
+                <FormGroup row>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.is_ad_hoc}
+                        onChange={handleCheckboxChange('is_ad_hoc')}
+                      />
+                    }
+                    label="Ad hoc room"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.is_room_swap}
+                        onChange={handleCheckboxChange('is_room_swap')}
+                      />
+                    }
+                    label="Room swap"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.is_over_4_weeks}
+                        onChange={handleCheckboxChange('is_over_4_weeks')}
+                      />
+                    }
+                    label="Over 4 weeks"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.is_under_4_weeks}
+                        onChange={handleCheckboxChange('is_under_4_weeks')}
+                      />
+                    }
+                    label="Less than 4 weeks"
+                  />
+                </FormGroup>
               </Grid>
 
               <Grid item xs={12}>

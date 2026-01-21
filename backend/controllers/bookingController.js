@@ -5,7 +5,7 @@ const db = require('../config/database');
  */
 async function getAllBookings(req, res) {
     try {
-        const { start_date, end_date, room_id, clinic_id, status, specialty, is_reallocated } = req.query;
+        const { start_date, end_date, room_id, clinic_id, status, specialty, is_reallocated, session } = req.query;
 
         let query = `
             SELECT b.*, r.room_name, r.room_number, c.clinic_name, c.clinic_code as clinic_code_name,
@@ -41,8 +41,8 @@ async function getAllBookings(req, res) {
         }
 
         if (specialty) {
-            query += ' AND b.specialty LIKE ?';
-            params.push(`%${specialty}%`);
+            query += ' AND b.specialty = ?';
+            params.push(specialty);
         }
 
         if (status) {
@@ -50,9 +50,14 @@ async function getAllBookings(req, res) {
             params.push(status);
         }
 
-        if (is_reallocated !== undefined) {
+        if (is_reallocated !== undefined && is_reallocated !== '') {
             query += ' AND b.is_reallocated = ?';
             params.push(is_reallocated === 'true' ? 1 : 0);
+        }
+
+        if (session) {
+            query += ' AND b.session = ?';
+            params.push(session);
         }
 
         query += ' ORDER BY b.booking_date, b.start_time';
@@ -98,24 +103,42 @@ async function getBooking(req, res) {
 /**
  * Create one-time booking
  */
+// Helper function to get start/end times from session
+function getTimesFromSession(session) {
+    switch (session) {
+        case 'am':
+            return { start_time: '08:00', end_time: '12:00', duration_minutes: 240 };
+        case 'pm':
+            return { start_time: '12:00', end_time: '17:00', duration_minutes: 300 };
+        case 'all_day':
+        default:
+            return { start_time: '08:00', end_time: '17:00', duration_minutes: 540 };
+    }
+}
+
 async function createBooking(req, res) {
     try {
         const {
             clinic_id,
             room_id,
             booking_date,
-            start_time,
-            end_time,
-            duration_minutes,
+            session,
             specialty,
             clinic_code,
             doctor_name,
             notes,
-            color
+            color,
+            is_ad_hoc,
+            is_room_swap,
+            is_over_4_weeks,
+            is_under_4_weeks
         } = req.body;
 
+        // Get times from session
+        const { start_time, end_time, duration_minutes } = getTimesFromSession(session);
+
         // Validate required fields
-        if (!clinic_id || !room_id || !booking_date || !start_time || !end_time) {
+        if (!clinic_id || !room_id || !booking_date || !session) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
@@ -169,14 +192,16 @@ async function createBooking(req, res) {
         // Create booking
         const result = await db.run(`
             INSERT INTO bookings (
-                clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
+                clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
                 specialty, clinic_code, doctor_name, notes, color, created_by,
-                is_reallocated, previous_booking_id, reallocated_by, reallocated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                is_reallocated, previous_booking_id, reallocated_by, reallocated_at,
+                is_ad_hoc, is_room_swap, is_over_4_weeks, is_under_4_weeks
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            clinic_id, room_id, booking_date, start_time, end_time, duration_minutes || 60,
+            clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session || 'all_day',
             specialty, clinic_code, doctor_name, notes, color || '#1976d2', req.user.id,
-            isReallocated, previousBookingId, reallocatedBy, reallocatedAt
+            isReallocated, previousBookingId, reallocatedBy, reallocatedAt,
+            is_ad_hoc ? 1 : 0, is_room_swap ? 1 : 0, is_over_4_weeks ? 1 : 0, is_under_4_weeks ? 1 : 0
         ]);
 
         const booking = await db.get('SELECT * FROM bookings WHERE id = ?', [result.id]);

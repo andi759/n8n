@@ -25,7 +25,8 @@ export const updateSeries = async (id, seriesData) => {
   return response.data;
 };
 
-export const deleteSeries = async (id) => {
-  const response = await api.delete(`/booking-series/${id}`);
+export const deleteSeries = async (id, fromDate = null) => {
+  const params = fromDate ? { from_date: fromDate } : {};
+  const response = await api.delete(`/booking-series/${id}`, { params });
   return response.data;
 };

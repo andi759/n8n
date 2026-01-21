@@ -28,13 +28,43 @@ import { getAllBookings, deleteBooking } from '../services/bookingService';
 import { deleteSeries } from '../services/seriesService';
 import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
-import { format } from 'date-fns';
+import { getAllSpecialties } from '../services/specialtyService';
+import { format, parse } from 'date-fns';
+
+const SESSION_OPTIONS = [
+  { value: '', label: 'All Sessions' },
+  { value: 'all_day', label: 'All Day' },
+  { value: 'am', label: 'AM' },
+  { value: 'pm', label: 'PM' },
+];
+
+// Helper function to format session display
+const getSessionLabel = (session) => {
+  switch (session) {
+    case 'am': return 'AM';
+    case 'pm': return 'PM';
+    case 'all_day': return 'All Day';
+    default: return session || '-';
+  }
+};
+
+// Helper function to format date as UK format (dd/MM/yyyy)
+const formatDateUK = (dateString) => {
+  try {
+    // Handle YYYY-MM-DD format from database
+    const date = new Date(dateString);
+    return format(date, 'dd/MM/yyyy');
+  } catch (error) {
+    return dateString;
+  }
+};
 
 function BookingList() {
   const [bookings, setBookings] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
+  const [specialties, setSpecialties] = useState([]);
   const [filters, setFilters] = useState({
     start_date: format(new Date(), 'yyyy-MM-dd'),
     end_date: null,
@@ -43,6 +73,7 @@ function BookingList() {
     specialty: '',
     status: '',
     is_reallocated: '',
+    session: '',
   });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -53,6 +84,7 @@ function BookingList() {
   useEffect(() => {
     loadClinics();
     loadRooms();
+    loadSpecialties();
     loadBookings();
   }, []);
 
@@ -87,6 +119,15 @@ function BookingList() {
     }
   };
 
+  const loadSpecialties = async () => {
+    try {
+      const data = await getAllSpecialties();
+      setSpecialties(data);
+    } catch (error) {
+      console.error('Failed to load specialties:', error);
+    }
+  };
+
   const loadBookings = async () => {
     setLoading(true);
     try {
@@ -98,6 +139,7 @@ function BookingList() {
       if (filters.specialty) params.specialty = filters.specialty;
       if (filters.status) params.status = filters.status;
       if (filters.is_reallocated) params.is_reallocated = filters.is_reallocated;
+      if (filters.session) params.session = filters.session;
 
       const data = await getAllBookings(params);
       setBookings(data);
@@ -134,7 +176,8 @@ function BookingList() {
   const handleDeleteSeries = async () => {
     if (bookingToDelete && bookingToDelete.series_id) {
       try {
-        await deleteSeries(bookingToDelete.series_id);
+        // Pass the booking date as from_date so only this booking and future ones are cancelled
+        await deleteSeries(bookingToDelete.series_id, bookingToDelete.booking_date);
         loadBookings();
       } catch (error) {
         console.error('Failed to delete series:', error);
@@ -173,6 +216,7 @@ function BookingList() {
               label="Start Date"
               value={filters.start_date ? new Date(filters.start_date) : null}
               onChange={(date) => handleFilterChange('start_date', date ? format(date, 'yyyy-MM-dd') : '')}
+              format="dd/MM/yyyy"
               slotProps={{ textField: { size: 'small', sx: { minWidth: 180 } } }}
             />
 
@@ -180,6 +224,7 @@ function BookingList() {
               label="End Date"
               value={filters.end_date ? new Date(filters.end_date) : null}
               onChange={(date) => handleFilterChange('end_date', date ? format(date, 'yyyy-MM-dd') : '')}
+              format="dd/MM/yyyy"
               slotProps={{ textField: { size: 'small', sx: { minWidth: 180 } } }}
             />
 
@@ -216,13 +261,45 @@ function BookingList() {
             </TextField>
 
             <TextField
+              select
               label="Specialty"
               size="small"
               value={filters.specialty}
               onChange={(e) => handleFilterChange('specialty', e.target.value)}
-              placeholder="Filter by specialty"
               sx={{ minWidth: 150 }}
-            />
+            >
+              <MenuItem value="">All Specialties</MenuItem>
+              {specialties.map(specialty => (
+                <MenuItem key={specialty.id} value={specialty.name}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '2px',
+                        backgroundColor: specialty.color,
+                      }}
+                    />
+                    {specialty.name}
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Session"
+              size="small"
+              value={filters.session}
+              onChange={(e) => handleFilterChange('session', e.target.value)}
+              sx={{ minWidth: 120 }}
+            >
+              {SESSION_OPTIONS.map(option => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
 
             <TextField
               select
@@ -270,7 +347,7 @@ function BookingList() {
               <TableRow>
                 <TableCell sx={{ width: '40px' }}></TableCell>
                 <TableCell>Date</TableCell>
-                <TableCell>Time</TableCell>
+                <TableCell>Session</TableCell>
                 <TableCell>Clinic</TableCell>
                 <TableCell>Room</TableCell>
                 <TableCell>Specialty</TableCell>
@@ -298,10 +375,10 @@ function BookingList() {
                       />
                     </TableCell>
                     <TableCell>
-                      {format(new Date(booking.booking_date), 'MMM dd, yyyy')}
+                      {formatDateUK(booking.booking_date)}
                     </TableCell>
                     <TableCell>
-                      {booking.start_time} - {booking.end_time}
+                      {getSessionLabel(booking.session)}
                     </TableCell>
                     <TableCell>{booking.clinic_name}</TableCell>
                     <TableCell>{booking.room_name}</TableCell>
@@ -373,10 +450,10 @@ function BookingList() {
               </Typography>
               <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 2 }}>
                 <Typography variant="body2">
-                  <strong>Date:</strong> {bookingToDelete.booking_date}
+                  <strong>Date:</strong> {formatDateUK(bookingToDelete.booking_date)}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Time:</strong> {bookingToDelete.start_time} - {bookingToDelete.end_time}
+                  <strong>Session:</strong> {getSessionLabel(bookingToDelete.session)}
                 </Typography>
                 <Typography variant="body2">
                   <strong>Room:</strong> {bookingToDelete.room_name}
@@ -389,7 +466,7 @@ function BookingList() {
               </Box>
               {bookingToDelete.series_id && (
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  This booking is part of a recurring series. You can cancel just this single booking, or cancel the entire series.
+                  This booking is part of a recurring series. You can cancel just this single booking, or cancel this booking and all future bookings in the series.
                 </Alert>
               )}
             </Box>
@@ -401,7 +478,7 @@ function BookingList() {
           </Button>
           {bookingToDelete?.series_id && (
             <Button onClick={handleDeleteSeries} color="error" variant="outlined">
-              Cancel Entire Series
+              Cancel This & Future Bookings
             </Button>
           )}
           <Button onClick={handleDeleteSingle} color="error" variant="contained">

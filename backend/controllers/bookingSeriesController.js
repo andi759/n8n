@@ -109,15 +109,26 @@ async function previewSeries(req, res) {
 /**
  * Create booking series
  */
+// Helper function to get start/end times from session
+function getTimesFromSession(session) {
+    switch (session) {
+        case 'am':
+            return { start_time: '08:00', end_time: '12:00', duration_minutes: 240 };
+        case 'pm':
+            return { start_time: '12:00', end_time: '17:00', duration_minutes: 300 };
+        case 'all_day':
+        default:
+            return { start_time: '08:00', end_time: '17:00', duration_minutes: 540 };
+    }
+}
+
 async function createSeries(req, res) {
     try {
         const {
             clinic_id,
             room_id,
             series_name,
-            start_time,
-            end_time,
-            duration_minutes,
+            session,
             specialty,
             clinic_code,
             doctor_name,
@@ -130,20 +141,23 @@ async function createSeries(req, res) {
             excluded_dates = []  // Array of dates to skip (e.g., conflicts or user-excluded)
         } = req.body;
 
+        // Get times from session
+        const { start_time, end_time, duration_minutes } = getTimesFromSession(session);
+
         // Validate required fields
-        if (!clinic_id || !room_id || !start_time || !end_time || !recurrence_type || !series_start_date) {
+        if (!clinic_id || !room_id || !session || !recurrence_type || !series_start_date) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
         // Create series record
         const seriesResult = await db.run(`
             INSERT INTO booking_series (
-                clinic_id, room_id, series_name, start_time, end_time, duration_minutes,
+                clinic_id, room_id, series_name, start_time, end_time, duration_minutes, session,
                 specialty, clinic_code, doctor_name, notes, color, recurrence_type, recurrence_pattern,
                 series_start_date, series_end_date, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            clinic_id, room_id, series_name, start_time, end_time, duration_minutes || 60,
+            clinic_id, room_id, series_name, start_time, end_time, duration_minutes, session || 'all_day',
             specialty, clinic_code, doctor_name, notes, color || '#1976d2', recurrence_type,
             JSON.stringify(recurrence_pattern), series_start_date, series_end_date,
             req.user.id
@@ -184,12 +198,12 @@ async function createSeries(req, res) {
         const insertPromises = filteredInstances.map(instance =>
             db.run(`
                 INSERT INTO bookings (
-                    series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
+                    series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
                     specialty, clinic_code, doctor_name, notes, color, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 instance.series_id, instance.clinic_id, instance.room_id, instance.booking_date,
-                instance.start_time, instance.end_time, instance.duration_minutes,
+                instance.start_time, instance.end_time, instance.duration_minutes, instance.session || session || 'all_day',
                 instance.specialty, instance.clinic_code, instance.doctor_name,
                 instance.notes, instance.color || series.color || '#1976d2',
                 instance.created_by
@@ -286,29 +300,38 @@ async function updateSeries(req, res) {
 }
 
 /**
- * Delete/cancel entire series
+ * Delete/cancel series from a specific date forward
+ * Query params:
+ * - from_date: The date from which to cancel (includes this date and future dates)
+ *              If not provided, cancels from today forward
  */
 async function deleteSeries(req, res) {
     try {
         const { id } = req.params;
+        const { from_date } = req.query;
 
         const series = await db.get('SELECT * FROM booking_series WHERE id = ?', [id]);
         if (!series) {
             return res.status(404).json({ error: 'Series not found' });
         }
 
+        // Use from_date if provided, otherwise use today
+        const cancelFromDate = from_date || new Date().toISOString().split('T')[0];
+
         // Mark series as inactive
         await db.run('UPDATE booking_series SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
 
-        // Cancel all future bookings
-        const today = new Date().toISOString().split('T')[0];
+        // Cancel bookings from the specified date forward (not past bookings)
         await db.run(`
             UPDATE bookings
             SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
             WHERE series_id = ? AND booking_date >= ?
-        `, [id, today]);
+        `, [id, cancelFromDate]);
 
-        res.json({ message: 'Series cancelled successfully' });
+        res.json({
+            message: 'Series cancelled successfully',
+            cancelled_from: cancelFromDate
+        });
     } catch (error) {
         console.error('Delete series error:', error);
         res.status(500).json({ error: 'Server error' });

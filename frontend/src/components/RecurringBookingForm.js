@@ -23,6 +23,12 @@ import { getAllSpecialties } from '../services/specialtyService';
 import { formatDate } from '../utils/rotorHelper';
 import { getRecurrenceDescription } from '../utils/recurrenceHelper';
 
+const SESSION_OPTIONS = [
+  { value: 'all_day', label: 'All Day' },
+  { value: 'am', label: 'AM' },
+  { value: 'pm', label: 'PM' },
+];
+
 function RecurringBookingForm() {
   const navigate = useNavigate();
   const [clinics, setClinics] = useState([]);
@@ -32,8 +38,7 @@ function RecurringBookingForm() {
     clinic_id: '',
     room_id: '',
     series_name: '',
-    start_time: '09:00',
-    end_time: '10:00',
+    session: 'all_day',
     specialty: '',
     clinic_code: '',
     doctor_name: '',
@@ -119,23 +124,10 @@ function RecurringBookingForm() {
     }));
   };
 
-  const calculateDuration = () => {
-    const [startHour, startMin] = formData.start_time.split(':').map(Number);
-    const [endHour, endMin] = formData.end_time.split(':').map(Number);
-    return (endHour * 60 + endMin) - (startHour * 60 + startMin);
-  };
-
   const handlePreview = async () => {
     setError('');
 
     try {
-      const duration = calculateDuration();
-
-      if (duration <= 0) {
-        setError('End time must be after start time');
-        return;
-      }
-
       if (!formData.recurrence_pattern) {
         setError('Please configure the recurrence pattern');
         return;
@@ -145,7 +137,6 @@ function RecurringBookingForm() {
         ...formData,
         series_start_date: formatDate(formData.series_start_date),
         series_end_date: formData.series_end_date ? formatDate(formData.series_end_date) : null,
-        duration_minutes: duration,
       };
 
       const preview = await previewSeries(seriesData);
@@ -161,14 +152,11 @@ function RecurringBookingForm() {
     setError('');
 
     try {
-      const duration = calculateDuration();
-
       const seriesData = {
         ...formData,
         series_start_date: formatDate(formData.series_start_date),
         series_end_date: formData.series_end_date ? formatDate(formData.series_end_date) : null,
-        duration_minutes: duration,
-        excluded_dates: excludedDates,  // Pass excluded dates to backend
+        excluded_dates: excludedDates,
       };
 
       await createSeries(seriesData);
@@ -248,26 +236,19 @@ function RecurringBookingForm() {
 
             <Grid item xs={12} md={6}>
               <TextField
-                label="Start Time"
-                type="time"
+                select
+                label="Session"
                 fullWidth
                 required
-                value={formData.start_time}
-                onChange={(e) => handleChange('start_time', e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="End Time"
-                type="time"
-                fullWidth
-                required
-                value={formData.end_time}
-                onChange={(e) => handleChange('end_time', e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
+                value={formData.session}
+                onChange={(e) => handleChange('session', e.target.value)}
+              >
+                {SESSION_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
 
             <Grid item xs={12} md={6}>
@@ -353,6 +334,7 @@ function RecurringBookingForm() {
                 label="Series Start Date"
                 value={formData.series_start_date}
                 onChange={(newDate) => handleChange('series_start_date', newDate)}
+                format="dd/MM/yyyy"
                 slotProps={{ textField: { fullWidth: true, required: true } }}
               />
             </Grid>
@@ -362,6 +344,7 @@ function RecurringBookingForm() {
                 label="Series End Date (Optional)"
                 value={formData.series_end_date}
                 onChange={(newDate) => handleChange('series_end_date', newDate)}
+                format="dd/MM/yyyy"
                 slotProps={{
                   textField: {
                     fullWidth: true,

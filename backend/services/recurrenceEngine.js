@@ -49,6 +49,7 @@ function generateBookingInstances(series, rangeStart, rangeEnd, rotorCycleStart)
         start_time: series.start_time,
         end_time: series.end_time,
         duration_minutes: parseInt(series.duration_minutes, 10) || 60,
+        session: series.session || 'all_day',
         specialty: series.specialty,
         clinic_code: series.clinic_code,
         doctor_name: series.doctor_name,

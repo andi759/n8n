@@ -72,6 +72,39 @@ async function runMigrations() {
             }
         }
 
+        // Add session column to bookings (replaces start_time/end_time with All Day, AM, PM)
+        try {
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS session VARCHAR(20) DEFAULT 'all_day'`);
+            migrations.push('Checked session column on bookings');
+        } catch (err) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+                console.error('Migration error (bookings.session):', err.message);
+            }
+        }
+
+        // Add session column to booking_series
+        try {
+            await db.exec(`ALTER TABLE booking_series ADD COLUMN IF NOT EXISTS session VARCHAR(20) DEFAULT 'all_day'`);
+            migrations.push('Checked session column on booking_series');
+        } catch (err) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+                console.error('Migration error (booking_series.session):', err.message);
+            }
+        }
+
+        // Add booking type flags to bookings table (for reporting)
+        try {
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_ad_hoc INTEGER DEFAULT 0`);
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_room_swap INTEGER DEFAULT 0`);
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_over_4_weeks INTEGER DEFAULT 0`);
+            await db.exec(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_under_4_weeks INTEGER DEFAULT 0`);
+            migrations.push('Checked booking type columns on bookings');
+        } catch (err) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+                console.error('Migration error (booking type columns):', err.message);
+            }
+        }
+
         // Insert default specialties if table is empty
         try {
             const count = await db.get('SELECT COUNT(*) as count FROM specialties');
