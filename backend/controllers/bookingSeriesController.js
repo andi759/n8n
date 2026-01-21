@@ -113,12 +113,12 @@ async function previewSeries(req, res) {
 function getTimesFromSession(session) {
     switch (session) {
         case 'am':
-            return { start_time: '08:00', end_time: '12:00', duration_minutes: 240 };
+            return { start_time: '08:30', end_time: '12:30', duration_minutes: 240 };
         case 'pm':
-            return { start_time: '12:00', end_time: '17:00', duration_minutes: 300 };
+            return { start_time: '13:30', end_time: '17:30', duration_minutes: 240 };
         case 'all_day':
         default:
-            return { start_time: '08:00', end_time: '17:00', duration_minutes: 540 };
+            return { start_time: '08:30', end_time: '17:30', duration_minutes: 540 };
     }
 }
 
