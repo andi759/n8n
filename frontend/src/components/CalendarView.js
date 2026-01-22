@@ -9,12 +9,10 @@ import {
   MenuItem,
   Button,
   IconButton,
-  Chip,
   FormControlLabel,
   Checkbox,
   Grid,
   Paper,
-  Tooltip,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -38,7 +36,6 @@ import {
   subWeeks,
   subMonths,
   isSameMonth,
-  isSameDay,
   isToday,
   getDay,
 } from 'date-fns';
@@ -57,11 +54,6 @@ const getSessionLabel = (session) => {
     case 'all_day': return 'All Day';
     default: return session || '-';
   }
-};
-
-// Helper function to format date as UK format (dd/MM/yyyy)
-const formatDateUK = (date) => {
-  return format(date, 'dd/MM/yyyy');
 };
 
 // Get the Sunday before the given date (start of week)
@@ -268,46 +260,98 @@ function CalendarView() {
     return days;
   };
 
-  // Render a booking chip
-  const renderBookingChip = (booking, compact = false) => {
+  // Render an expanded booking card with all details
+  const renderBookingCard = (booking, compact = false) => {
     const isCancelled = booking.status === 'cancelled';
+    const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
 
     return (
-      <Tooltip
+      <Paper
         key={booking.id}
-        title={
-          <Box>
-            <Typography variant="body2"><strong>{booking.room_name}</strong></Typography>
-            <Typography variant="body2">{booking.specialty || 'No specialty'}</Typography>
-            <Typography variant="body2">Session: {getSessionLabel(booking.session)}</Typography>
-            {booking.doctor_name && <Typography variant="body2">Dr: {booking.doctor_name}</Typography>}
-            {booking.clinic_code && <Typography variant="body2">Code: {booking.clinic_code}</Typography>}
-            {isCancelled && <Typography variant="body2" color="error">CANCELLED</Typography>}
-          </Box>
-        }
-        arrow
+        elevation={1}
+        sx={{
+          p: compact ? 0.75 : 1,
+          mb: 0.5,
+          backgroundColor: bgColor,
+          color: 'white',
+          opacity: isCancelled ? 0.8 : 1,
+          borderRadius: 1,
+        }}
       >
-        <Chip
-          size="small"
-          label={compact ? booking.room_name?.substring(0, 10) : `${booking.room_name} - ${booking.specialty || 'No specialty'}`}
+        <Typography
+          variant="body2"
           sx={{
-            backgroundColor: isCancelled ? '#9e9e9e' : (booking.color || '#1976d2'),
-            color: 'white',
-            fontSize: compact ? '0.65rem' : '0.75rem',
-            height: compact ? '20px' : '24px',
-            mb: 0.5,
-            width: '100%',
-            justifyContent: 'flex-start',
+            fontWeight: 'bold',
+            fontSize: compact ? '0.7rem' : '0.8rem',
             textDecoration: isCancelled ? 'line-through' : 'none',
-            opacity: isCancelled ? 0.7 : 1,
-            '& .MuiChip-label': {
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            },
+            lineHeight: 1.2,
           }}
-        />
-      </Tooltip>
+        >
+          {booking.room_name}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            fontSize: compact ? '0.6rem' : '0.7rem',
+            lineHeight: 1.1,
+            opacity: 0.95,
+          }}
+        >
+          {booking.specialty || 'No specialty'}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            fontSize: compact ? '0.6rem' : '0.7rem',
+            lineHeight: 1.1,
+            opacity: 0.95,
+          }}
+        >
+          {getSessionLabel(booking.session)}
+        </Typography>
+        {booking.doctor_name && (
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              fontSize: compact ? '0.55rem' : '0.65rem',
+              lineHeight: 1.1,
+              opacity: 0.9,
+            }}
+          >
+            Dr: {booking.doctor_name}
+          </Typography>
+        )}
+        {booking.clinic_code && (
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              fontSize: compact ? '0.55rem' : '0.65rem',
+              lineHeight: 1.1,
+              opacity: 0.9,
+            }}
+          >
+            Code: {booking.clinic_code}
+          </Typography>
+        )}
+        {isCancelled && (
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              fontSize: compact ? '0.6rem' : '0.7rem',
+              fontWeight: 'bold',
+              color: '#ffcdd2',
+              lineHeight: 1.1,
+            }}
+          >
+            CANCELLED
+          </Typography>
+        )}
+      </Paper>
     );
   };
 
@@ -333,7 +377,7 @@ function CalendarView() {
 
         {/* Calendar grid */}
         {weeks.map((week, weekIndex) => (
-          <Grid container key={weekIndex} sx={{ minHeight: '120px' }}>
+          <Grid container key={weekIndex} sx={{ minHeight: '180px' }}>
             {week.map(day => {
               const dayBookings = getBookingsForDate(day);
               const isCurrentMonth = isSameMonth(day, currentDate);
@@ -349,7 +393,7 @@ function CalendarView() {
                     borderTop: 'none',
                     borderLeft: 'none',
                     p: 0.5,
-                    minHeight: '120px',
+                    minHeight: '180px',
                     backgroundColor: isCurrentDay ? 'rgba(25, 118, 210, 0.08)' : (isCurrentMonth ? 'white' : '#fafafa'),
                   }}
                 >
@@ -363,13 +407,8 @@ function CalendarView() {
                   >
                     {format(day, 'd')}
                   </Typography>
-                  <Box sx={{ maxHeight: '85px', overflow: 'auto' }}>
-                    {dayBookings.slice(0, 3).map(booking => renderBookingChip(booking, true))}
-                    {dayBookings.length > 3 && (
-                      <Typography variant="caption" color="text.secondary">
-                        +{dayBookings.length - 3} more
-                      </Typography>
-                    )}
+                  <Box sx={{ maxHeight: '150px', overflow: 'auto' }}>
+                    {dayBookings.map(booking => renderBookingCard(booking, true))}
                   </Box>
                 </Grid>
               );
@@ -430,46 +469,98 @@ function CalendarView() {
                       No bookings
                     </Typography>
                   ) : (
-                    dayBookings.map(booking => (
-                      <Paper
-                        key={booking.id}
-                        elevation={1}
-                        sx={{
-                          p: 1,
-                          mb: 1,
-                          borderLeft: `4px solid ${booking.status === 'cancelled' ? '#9e9e9e' : (booking.color || '#1976d2')}`,
-                          backgroundColor: booking.status === 'cancelled' ? '#f5f5f5' : 'white',
-                          opacity: booking.status === 'cancelled' ? 0.7 : 1,
-                        }}
-                      >
-                        <Typography
-                          variant="body2"
-                          fontWeight="bold"
-                          sx={{ textDecoration: booking.status === 'cancelled' ? 'line-through' : 'none' }}
+                    dayBookings.map(booking => {
+                      const isCancelled = booking.status === 'cancelled';
+                      const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
+
+                      return (
+                        <Paper
+                          key={booking.id}
+                          elevation={2}
+                          sx={{
+                            p: 1.5,
+                            mb: 1,
+                            backgroundColor: bgColor,
+                            color: 'white',
+                            opacity: isCancelled ? 0.8 : 1,
+                            borderRadius: 1,
+                          }}
                         >
-                          {booking.room_name}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          {getSessionLabel(booking.session)}
-                        </Typography>
-                        {booking.specialty && (
-                          <Chip
-                            size="small"
-                            label={booking.specialty}
+                          <Typography
+                            variant="body2"
                             sx={{
-                              mt: 0.5,
-                              backgroundColor: booking.color || '#1976d2',
-                              color: 'white',
-                              fontSize: '0.7rem',
-                              height: '20px',
+                              fontWeight: 'bold',
+                              textDecoration: isCancelled ? 'line-through' : 'none',
+                              lineHeight: 1.3,
                             }}
-                          />
-                        )}
-                        {booking.status === 'cancelled' && (
-                          <Chip size="small" label="Cancelled" color="error" sx={{ mt: 0.5, ml: 0.5, height: '20px' }} />
-                        )}
-                      </Paper>
-                    ))
+                          >
+                            {booking.room_name}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              display: 'block',
+                              fontSize: '0.75rem',
+                              lineHeight: 1.2,
+                              opacity: 0.95,
+                            }}
+                          >
+                            {booking.specialty || 'No specialty'}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              display: 'block',
+                              fontSize: '0.75rem',
+                              lineHeight: 1.2,
+                              opacity: 0.95,
+                            }}
+                          >
+                            {getSessionLabel(booking.session)}
+                          </Typography>
+                          {booking.doctor_name && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                display: 'block',
+                                fontSize: '0.7rem',
+                                lineHeight: 1.2,
+                                opacity: 0.9,
+                              }}
+                            >
+                              Dr: {booking.doctor_name}
+                            </Typography>
+                          )}
+                          {booking.clinic_code && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                display: 'block',
+                                fontSize: '0.7rem',
+                                lineHeight: 1.2,
+                                opacity: 0.9,
+                              }}
+                            >
+                              Code: {booking.clinic_code}
+                            </Typography>
+                          )}
+                          {isCancelled && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                display: 'block',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold',
+                                color: '#ffcdd2',
+                                mt: 0.5,
+                              }}
+                            >
+                              CANCELLED
+                            </Typography>
+                          )}
+                        </Paper>
+                      );
+                    })
                   )}
                 </Box>
               </Grid>
@@ -498,53 +589,99 @@ function CalendarView() {
           <Typography variant="body2" color="text.secondary">No bookings</Typography>
         ) : (
           <Grid container spacing={2}>
-            {sessionBookings.map(booking => (
-              <Grid item xs={12} md={6} lg={4} key={booking.id}>
-                <Paper
-                  elevation={2}
-                  sx={{
-                    p: 2,
-                    borderLeft: `6px solid ${booking.status === 'cancelled' ? '#9e9e9e' : (booking.color || '#1976d2')}`,
-                    backgroundColor: booking.status === 'cancelled' ? '#f5f5f5' : 'white',
-                    opacity: booking.status === 'cancelled' ? 0.7 : 1,
-                  }}
-                >
-                  <Typography
-                    variant="h6"
-                    sx={{ textDecoration: booking.status === 'cancelled' ? 'line-through' : 'none' }}
+            {sessionBookings.map(booking => {
+              const isCancelled = booking.status === 'cancelled';
+              const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
+
+              return (
+                <Grid item xs={12} md={6} lg={4} key={booking.id}>
+                  <Paper
+                    elevation={3}
+                    sx={{
+                      p: 2,
+                      backgroundColor: bgColor,
+                      color: 'white',
+                      opacity: isCancelled ? 0.8 : 1,
+                      borderRadius: 2,
+                    }}
                   >
-                    {booking.room_name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {booking.clinic_name}
-                  </Typography>
-                  {booking.specialty && (
-                    <Chip
-                      size="small"
-                      label={booking.specialty}
+                    <Typography
+                      variant="h6"
                       sx={{
-                        mt: 1,
-                        backgroundColor: booking.color || '#1976d2',
-                        color: 'white',
+                        textDecoration: isCancelled ? 'line-through' : 'none',
+                        fontWeight: 'bold',
                       }}
-                    />
-                  )}
-                  {booking.doctor_name && (
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      <strong>Doctor:</strong> {booking.doctor_name}
+                    >
+                      {booking.room_name}
                     </Typography>
-                  )}
-                  {booking.clinic_code && (
-                    <Typography variant="body2">
-                      <strong>Code:</strong> {booking.clinic_code}
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        opacity: 0.95,
+                        mt: 0.5,
+                      }}
+                    >
+                      {booking.specialty || 'No specialty'}
                     </Typography>
-                  )}
-                  {booking.status === 'cancelled' && (
-                    <Chip size="small" label="Cancelled" color="error" sx={{ mt: 1 }} />
-                  )}
-                </Paper>
-              </Grid>
-            ))}
+                    {booking.clinic_name && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          opacity: 0.9,
+                        }}
+                      >
+                        {booking.clinic_name}
+                      </Typography>
+                    )}
+                    {booking.doctor_name && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          mt: 1,
+                          opacity: 0.95,
+                        }}
+                      >
+                        <strong>Doctor:</strong> {booking.doctor_name}
+                      </Typography>
+                    )}
+                    {booking.clinic_code && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          opacity: 0.95,
+                        }}
+                      >
+                        <strong>Code:</strong> {booking.clinic_code}
+                      </Typography>
+                    )}
+                    {booking.notes && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          mt: 1,
+                          opacity: 0.85,
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        {booking.notes}
+                      </Typography>
+                    )}
+                    {isCancelled && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          mt: 1,
+                          fontWeight: 'bold',
+                          color: '#ffcdd2',
+                        }}
+                      >
+                        CANCELLED
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              );
+            })}
           </Grid>
         )}
       </Box>
