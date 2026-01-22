@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Card,
@@ -22,7 +23,7 @@ import {
   DialogActions,
   Alert,
 } from '@mui/material';
-import { Delete, Refresh } from '@mui/icons-material';
+import { Delete, Edit, Refresh } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { getAllBookings, deleteBooking } from '../services/bookingService';
 import { deleteSeries } from '../services/seriesService';
@@ -59,7 +60,18 @@ const formatDateUK = (dateString) => {
   }
 };
 
+// Helper function to get day of week from date
+const getDayOfWeek = (dateString) => {
+  try {
+    const date = new Date(dateString);
+    return format(date, 'EEEE'); // Full day name (e.g., "Monday")
+  } catch (error) {
+    return '-';
+  }
+};
+
 function BookingList() {
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -190,6 +202,11 @@ function BookingList() {
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setBookingToDelete(null);
+  };
+
+  const handleEdit = (booking) => {
+    // Navigate to booking form with booking ID for editing
+    navigate(`/bookings/edit/${booking.id}`);
   };
 
   const getStatusColor = (status) => {
@@ -347,6 +364,7 @@ function BookingList() {
               <TableRow>
                 <TableCell sx={{ width: '40px' }}></TableCell>
                 <TableCell>Date</TableCell>
+                <TableCell>Day</TableCell>
                 <TableCell>Session</TableCell>
                 <TableCell>Clinic</TableCell>
                 <TableCell>Room</TableCell>
@@ -376,6 +394,9 @@ function BookingList() {
                     </TableCell>
                     <TableCell>
                       {formatDateUK(booking.booking_date)}
+                    </TableCell>
+                    <TableCell>
+                      {getDayOfWeek(booking.booking_date)}
                     </TableCell>
                     <TableCell>
                       {getSessionLabel(booking.session)}
@@ -411,6 +432,14 @@ function BookingList() {
                       )}
                     </TableCell>
                     <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        title="Edit"
+                        onClick={() => handleEdit(booking)}
+                        disabled={booking.status === 'cancelled'}
+                      >
+                        <Edit fontSize="small" />
+                      </IconButton>
                       <IconButton
                         size="small"
                         title="Cancel"

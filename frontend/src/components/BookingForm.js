@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Container,
   Card,
@@ -17,7 +17,7 @@ import {
   FormGroup,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { createBooking } from '../services/bookingService';
+import { createBooking, getBooking, updateBooking } from '../services/bookingService';
 import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
 import { getAllSpecialties } from '../services/specialtyService';
@@ -31,6 +31,8 @@ const SESSION_OPTIONS = [
 
 function BookingForm() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = Boolean(id);
   const [clinics, setClinics] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [specialties, setSpecialties] = useState([]);
@@ -52,11 +54,52 @@ function BookingForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(isEditMode);
 
   useEffect(() => {
     loadClinics();
     loadSpecialties();
   }, []);
+
+  // Load booking data if in edit mode
+  useEffect(() => {
+    if (isEditMode && id) {
+      loadBookingData(id);
+    }
+  }, [isEditMode, id]);
+
+  const loadBookingData = async (bookingId) => {
+    try {
+      setInitialLoading(true);
+      const booking = await getBooking(bookingId);
+
+      // Load rooms for the clinic first
+      if (booking.clinic_id) {
+        await loadRooms(booking.clinic_id);
+      }
+
+      setFormData({
+        clinic_id: booking.clinic_id || '',
+        room_id: booking.room_id || '',
+        booking_date: new Date(booking.booking_date),
+        session: booking.session || 'all_day',
+        specialty: booking.specialty || '',
+        clinic_code: booking.clinic_code || '',
+        doctor_name: booking.doctor_name || '',
+        notes: booking.notes || '',
+        color: booking.color || '#1976d2',
+        is_ad_hoc: Boolean(booking.is_ad_hoc),
+        is_room_swap: Boolean(booking.is_room_swap),
+        is_over_4_weeks: Boolean(booking.is_over_4_weeks),
+        is_under_4_weeks: Boolean(booking.is_under_4_weeks),
+      });
+    } catch (error) {
+      console.error('Failed to load booking:', error);
+      setError('Failed to load booking data');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   const loadSpecialties = async () => {
     try {
@@ -129,27 +172,43 @@ function BookingForm() {
         booking_date: formatDate(formData.booking_date),
       };
 
-      await createBooking(bookingData);
+      if (isEditMode) {
+        await updateBooking(id, bookingData);
+      } else {
+        await createBooking(bookingData);
+      }
       setSuccess(true);
 
       setTimeout(() => {
         navigate('/bookings');
       }, 2000);
     } catch (error) {
-      setError(error.response?.data?.error || 'Failed to create booking');
+      setError(error.response?.data?.error || `Failed to ${isEditMode ? 'update' : 'create'} booking`);
     } finally {
       setLoading(false);
     }
   };
 
+  if (initialLoading) {
+    return (
+      <Container maxWidth="md">
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h4" gutterBottom>
+            Loading...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="md">
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          Create One-Time Booking
+          {isEditMode ? 'Edit Booking' : 'Create One-Time Booking'}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Book a room for a single date
+          {isEditMode ? 'Update the booking details' : 'Book a room for a single date'}
         </Typography>
       </Box>
 
@@ -374,7 +433,7 @@ function BookingForm() {
                     variant="contained"
                     disabled={loading}
                   >
-                    {loading ? 'Creating...' : 'Create Booking'}
+                    {loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Booking' : 'Create Booking')}
                   </Button>
                 </Box>
               </Grid>
@@ -386,7 +445,7 @@ function BookingForm() {
       <Snackbar
         open={success}
         autoHideDuration={2000}
-        message="Booking created successfully!"
+        message={isEditMode ? "Booking updated successfully!" : "Booking created successfully!"}
       />
     </Container>
   );

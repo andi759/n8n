@@ -86,6 +86,14 @@ function App() {
               }
             />
             <Route
+              path="/bookings/edit/:id"
+              element={
+                <ProtectedRoute>
+                  <BookingForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/new-recurring"
               element={
                 <ProtectedRoute>
