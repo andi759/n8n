@@ -141,10 +141,45 @@ async function getRoomTypes(req, res) {
     }
 }
 
+/**
+ * Delete room
+ */
+async function deleteRoom(req, res) {
+    try {
+        const { id } = req.params;
+
+        const existing = await db.get('SELECT * FROM rooms WHERE id = ?', [id]);
+        if (!existing) {
+            return res.status(404).json({ error: 'Room not found' });
+        }
+
+        // Check if room has any bookings
+        const bookingCount = await db.get(
+            'SELECT COUNT(*) as count FROM bookings WHERE room_id = ?',
+            [id]
+        );
+
+        if (bookingCount && bookingCount.count > 0) {
+            return res.status(400).json({
+                error: 'Cannot delete room with existing bookings. Set room to inactive instead.',
+                has_bookings: true,
+                booking_count: bookingCount.count
+            });
+        }
+
+        await db.run('DELETE FROM rooms WHERE id = ?', [id]);
+        res.json({ message: 'Room deleted successfully' });
+    } catch (error) {
+        console.error('Delete room error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+}
+
 module.exports = {
     getAllRooms,
     getRoom,
     createRoom,
     updateRoom,
+    deleteRoom,
     getRoomTypes
 };

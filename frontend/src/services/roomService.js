@@ -24,3 +24,8 @@ export const updateRoom = async (id, roomData) => {
   const response = await api.put(`/rooms/${id}`, roomData);
   return response.data;
 };
+
+export const deleteRoom = async (id) => {
+  const response = await api.delete(`/rooms/${id}`);
+  return response.data;
+};

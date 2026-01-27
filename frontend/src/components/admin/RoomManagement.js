@@ -24,7 +24,7 @@ import {
   Snackbar,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
-import { getAllRooms, createRoom, updateRoom, getRoomTypes } from '../../services/roomService';
+import { getAllRooms, createRoom, updateRoom, deleteRoom, getRoomTypes } from '../../services/roomService';
 import { getAllClinics } from '../../services/clinicService';
 
 const EQUIPMENT_OPTIONS = [
@@ -63,6 +63,10 @@ function RoomManagement() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('Room saved successfully!');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     loadData();
@@ -140,12 +144,44 @@ function RoomManagement() {
         await createRoom(formData);
       }
 
+      setSuccessMessage('Room saved successfully!');
       setSuccess(true);
       handleCloseDialog();
       loadData();
     } catch (error) {
       setError(error.response?.data?.error || 'Failed to save room');
     }
+  };
+
+  const handleDeleteClick = (room) => {
+    setRoomToDelete(room);
+    setDeleteError('');
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!roomToDelete) return;
+
+    try {
+      await deleteRoom(roomToDelete.id);
+      setSuccessMessage('Room deleted successfully!');
+      setSuccess(true);
+      setDeleteDialogOpen(false);
+      setRoomToDelete(null);
+      loadData();
+    } catch (error) {
+      if (error.response?.data?.has_bookings) {
+        setDeleteError(`Cannot delete room with ${error.response.data.booking_count} existing booking(s). Set room to inactive instead.`);
+      } else {
+        setDeleteError(error.response?.data?.error || 'Failed to delete room');
+      }
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setRoomToDelete(null);
+    setDeleteError('');
   };
 
   return (
@@ -202,8 +238,11 @@ function RoomManagement() {
                 />
               </TableCell>
               <TableCell align="right">
-                <IconButton size="small" onClick={() => handleOpenDialog(room)}>
+                <IconButton size="small" onClick={() => handleOpenDialog(room)} title="Edit">
                   <Edit fontSize="small" />
+                </IconButton>
+                <IconButton size="small" onClick={() => handleDeleteClick(room)} title="Delete" color="error">
+                  <Delete fontSize="small" />
                 </IconButton>
               </TableCell>
             </TableRow>
@@ -337,11 +376,41 @@ function RoomManagement() {
         </DialogActions>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+        <DialogTitle>Delete Room</DialogTitle>
+        <DialogContent>
+          {roomToDelete && (
+            <Box>
+              <Typography>
+                Are you sure you want to delete this room?
+              </Typography>
+              <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mt: 2 }}>
+                <Typography variant="body2"><strong>Room:</strong> {roomToDelete.room_name}</Typography>
+                <Typography variant="body2"><strong>Room Number:</strong> {roomToDelete.room_number}</Typography>
+                <Typography variant="body2"><strong>Clinic:</strong> {roomToDelete.clinic_name}</Typography>
+              </Box>
+              {deleteError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {deleteError}
+                </Alert>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={success}
         autoHideDuration={3000}
         onClose={() => setSuccess(false)}
-        message="Room saved successfully!"
+        message={successMessage}
       />
     </Box>
   );
