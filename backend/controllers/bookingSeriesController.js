@@ -338,11 +338,114 @@ async function deleteSeries(req, res) {
     }
 }
 
+/**
+ * Extend a booking series by adding more instances
+ * This adds bookings from the current series end date to the new end date
+ */
+async function extendSeries(req, res) {
+    try {
+        const { id } = req.params;
+        const { new_end_date, excluded_dates = [] } = req.body;
+
+        if (!new_end_date) {
+            return res.status(400).json({ error: 'New end date is required' });
+        }
+
+        // Get the series
+        const series = await db.get('SELECT * FROM booking_series WHERE id = ?', [id]);
+        if (!series) {
+            return res.status(404).json({ error: 'Series not found' });
+        }
+
+        // Get the last booking date in this series
+        const lastBooking = await db.get(`
+            SELECT MAX(booking_date) as last_date
+            FROM bookings
+            WHERE series_id = ? AND status = 'confirmed'
+        `, [id]);
+
+        // Determine the start date for new instances
+        // Start from the day after the last booking, or from series_start_date if no bookings exist
+        let extensionStartDate;
+        if (lastBooking && lastBooking.last_date) {
+            const lastDate = new Date(lastBooking.last_date);
+            lastDate.setDate(lastDate.getDate() + 1);
+            extensionStartDate = lastDate.toISOString().split('T')[0];
+        } else {
+            extensionStartDate = series.series_start_date;
+        }
+
+        // Validate new end date is after the extension start
+        if (new_end_date <= extensionStartDate) {
+            return res.status(400).json({
+                error: 'New end date must be after the current last booking date',
+                current_last_date: lastBooking?.last_date || series.series_start_date
+            });
+        }
+
+        // Update series end date
+        await db.run(`
+            UPDATE booking_series
+            SET series_end_date = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `, [new_end_date, id]);
+
+        // Generate new instances for the extension period
+        const rotorCycleStart = await getRotorCycleStart();
+        let newInstances = generateBookingInstances(series, extensionStartDate, new_end_date, rotorCycleStart);
+
+        // Filter out excluded dates
+        const excludedSet = new Set(excluded_dates.map(d => String(d).substring(0, 10)));
+        const filteredInstances = newInstances.filter(
+            instance => !excludedSet.has(String(instance.booking_date).substring(0, 10))
+        );
+
+        // Check for conflicts with existing bookings
+        const conflicts = await checkConflicts(filteredInstances, db);
+        const conflictDates = new Set(conflicts.map(c => c.booking_date));
+
+        // Filter out conflicting dates
+        const instancesToCreate = filteredInstances.filter(
+            instance => !conflictDates.has(instance.booking_date)
+        );
+
+        // Insert new booking instances
+        const insertPromises = instancesToCreate.map(instance =>
+            db.run(`
+                INSERT INTO bookings (
+                    series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
+                    specialty, clinic_code, doctor_name, notes, color, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id, series.clinic_id, series.room_id, instance.booking_date,
+                series.start_time, series.end_time, series.duration_minutes, series.session || 'all_day',
+                series.specialty, series.clinic_code, series.doctor_name,
+                series.notes, series.color || '#1976d2',
+                req.user.id
+            ])
+        );
+
+        await Promise.all(insertPromises);
+
+        res.json({
+            message: 'Series extended successfully',
+            new_end_date,
+            instances_added: instancesToCreate.length,
+            conflicts_skipped: conflicts.length,
+            excluded_skipped: filteredInstances.length - instancesToCreate.length - conflicts.length
+        });
+    } catch (error) {
+        console.error('Extend series error:', error);
+        res.status(500).json({ error: error.message || 'Server error' });
+    }
+}
+
 module.exports = {
     getAllSeries,
     getSeries,
     previewSeries,
     createSeries,
     updateSeries,
-    deleteSeries
+    deleteSeries,
+    extendSeries
 };

@@ -23,10 +23,10 @@ import {
   DialogActions,
   Alert,
 } from '@mui/material';
-import { Delete, Edit, Refresh } from '@mui/icons-material';
+import { Delete, Edit, Refresh, MoreTime } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { getAllBookings, deleteBooking } from '../services/bookingService';
-import { deleteSeries } from '../services/seriesService';
+import { deleteSeries, extendSeries } from '../services/seriesService';
 import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
 import { getAllSpecialties } from '../services/specialtyService';
@@ -92,6 +92,11 @@ function BookingList() {
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDelete, setBookingToDelete] = useState(null);
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [bookingToExtend, setBookingToExtend] = useState(null);
+  const [extendEndDate, setExtendEndDate] = useState(null);
+  const [extendError, setExtendError] = useState('');
+  const [extendLoading, setExtendLoading] = useState(false);
 
   useEffect(() => {
     loadClinics();
@@ -207,6 +212,44 @@ function BookingList() {
   const handleEdit = (booking) => {
     // Navigate to booking form with booking ID for editing
     navigate(`/bookings/edit/${booking.id}`);
+  };
+
+  const handleExtendClick = (booking) => {
+    setBookingToExtend(booking);
+    setExtendEndDate(null);
+    setExtendError('');
+    setExtendDialogOpen(true);
+  };
+
+  const handleExtendConfirm = async () => {
+    if (!extendEndDate) {
+      setExtendError('Please select a new end date');
+      return;
+    }
+
+    setExtendLoading(true);
+    setExtendError('');
+
+    try {
+      const newEndDateStr = format(extendEndDate, 'yyyy-MM-dd');
+      await extendSeries(bookingToExtend.series_id, newEndDateStr);
+      setExtendDialogOpen(false);
+      setBookingToExtend(null);
+      setExtendEndDate(null);
+      loadBookings();
+    } catch (error) {
+      console.error('Failed to extend series:', error);
+      setExtendError(error.response?.data?.error || 'Failed to extend series');
+    } finally {
+      setExtendLoading(false);
+    }
+  };
+
+  const handleExtendCancel = () => {
+    setExtendDialogOpen(false);
+    setBookingToExtend(null);
+    setExtendEndDate(null);
+    setExtendError('');
   };
 
   const getStatusColor = (status) => {
@@ -440,6 +483,16 @@ function BookingList() {
                       >
                         <Edit fontSize="small" />
                       </IconButton>
+                      {booking.series_id && (
+                        <IconButton
+                          size="small"
+                          title="Extend Series"
+                          onClick={() => handleExtendClick(booking)}
+                          disabled={booking.status === 'cancelled'}
+                        >
+                          <MoreTime fontSize="small" />
+                        </IconButton>
+                      )}
                       <IconButton
                         size="small"
                         title="Cancel"
@@ -512,6 +565,70 @@ function BookingList() {
           )}
           <Button onClick={handleDeleteSingle} color="error" variant="contained">
             {bookingToDelete?.series_id ? 'Cancel This Booking Only' : 'Cancel Booking'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Extend Series Dialog */}
+      <Dialog open={extendDialogOpen} onClose={handleExtendCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Extend Recurring Series</DialogTitle>
+        <DialogContent>
+          {bookingToExtend && (
+            <Box>
+              <Typography sx={{ mb: 2 }}>
+                Extend this recurring booking series by adding more bookings to the end of the series.
+              </Typography>
+              <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 3 }}>
+                <Typography variant="body2">
+                  <strong>Room:</strong> {bookingToExtend.room_name}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Session:</strong> {getSessionLabel(bookingToExtend.session)}
+                </Typography>
+                {bookingToExtend.specialty && (
+                  <Typography variant="body2">
+                    <strong>Specialty:</strong> {bookingToExtend.specialty}
+                  </Typography>
+                )}
+                {bookingToExtend.doctor_name && (
+                  <Typography variant="body2">
+                    <strong>Doctor:</strong> {bookingToExtend.doctor_name}
+                  </Typography>
+                )}
+              </Box>
+              <DatePicker
+                label="New End Date"
+                value={extendEndDate}
+                onChange={(date) => setExtendEndDate(date)}
+                format="dd/MM/yyyy"
+                minDate={new Date()}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    required: true,
+                    helperText: 'Select the new end date for the series'
+                  }
+                }}
+              />
+              {extendError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {extendError}
+                </Alert>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleExtendCancel} disabled={extendLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleExtendConfirm}
+            color="primary"
+            variant="contained"
+            disabled={extendLoading || !extendEndDate}
+          >
+            {extendLoading ? 'Extending...' : 'Extend Series'}
           </Button>
         </DialogActions>
       </Dialog>

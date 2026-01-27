@@ -11,6 +11,7 @@ router.post('/preview', bookingSeriesController.previewSeries);
 router.get('/:id', bookingSeriesController.getSeries);
 router.post('/', bookingSeriesController.createSeries);
 router.put('/:id', bookingSeriesController.updateSeries);
+router.post('/:id/extend', bookingSeriesController.extendSeries);
 router.delete('/:id', bookingSeriesController.deleteSeries);
 
 module.exports = router;

@@ -30,3 +30,11 @@ export const deleteSeries = async (id, fromDate = null) => {
   const response = await api.delete(`/booking-series/${id}`, { params });
   return response.data;
 };
+
+export const extendSeries = async (id, newEndDate, excludedDates = []) => {
+  const response = await api.post(`/booking-series/${id}/extend`, {
+    new_end_date: newEndDate,
+    excluded_dates: excludedDates
+  });
+  return response.data;
+};
