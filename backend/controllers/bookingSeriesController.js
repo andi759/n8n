@@ -339,6 +339,83 @@ async function deleteSeries(req, res) {
 }
 
 /**
+ * Preview extending a booking series - shows what would be created and any conflicts
+ */
+async function previewExtendSeries(req, res) {
+    try {
+        const { id } = req.params;
+        const { new_end_date } = req.body;
+
+        if (!new_end_date) {
+            return res.status(400).json({ error: 'New end date is required' });
+        }
+
+        // Get the series
+        const series = await db.get('SELECT * FROM booking_series WHERE id = ?', [id]);
+        if (!series) {
+            return res.status(404).json({ error: 'Series not found' });
+        }
+
+        // Get the last booking date in this series
+        const lastBooking = await db.get(`
+            SELECT MAX(booking_date) as last_date
+            FROM bookings
+            WHERE series_id = ? AND status = 'confirmed'
+        `, [id]);
+
+        // Determine the start date for new instances
+        let extensionStartDate;
+        if (lastBooking && lastBooking.last_date) {
+            const lastDate = new Date(lastBooking.last_date);
+            lastDate.setDate(lastDate.getDate() + 1);
+            extensionStartDate = lastDate.toISOString().split('T')[0];
+        } else {
+            extensionStartDate = series.series_start_date;
+        }
+
+        // Validate new end date is after the extension start
+        if (new_end_date <= extensionStartDate) {
+            return res.status(400).json({
+                error: 'New end date must be after the current last booking date',
+                current_last_date: lastBooking?.last_date || series.series_start_date
+            });
+        }
+
+        // Generate new instances for the extension period
+        const rotorCycleStart = await getRotorCycleStart();
+        let newInstances = generateBookingInstances(series, extensionStartDate, new_end_date, rotorCycleStart);
+
+        // Check for conflicts with existing bookings
+        const conflicts = await checkConflicts(newInstances, db);
+        const conflictDates = new Set(conflicts.map(c => c.booking_date));
+
+        // Separate instances into those that will be created and those that conflict
+        const instancesToCreate = newInstances.filter(
+            instance => !conflictDates.has(instance.booking_date)
+        );
+        const conflictingInstances = newInstances.filter(
+            instance => conflictDates.has(instance.booking_date)
+        );
+
+        res.json({
+            series_id: id,
+            current_last_date: lastBooking?.last_date || series.series_start_date,
+            new_end_date,
+            total_new_instances: newInstances.length,
+            instances_to_create: instancesToCreate.length,
+            conflicts: conflictingInstances.map(instance => ({
+                date: instance.booking_date,
+                conflicting_booking: conflicts.find(c => c.booking_date === instance.booking_date)
+            })),
+            preview_dates: instancesToCreate.map(i => i.booking_date)
+        });
+    } catch (error) {
+        console.error('Preview extend series error:', error);
+        res.status(500).json({ error: error.message || 'Server error' });
+    }
+}
+
+/**
  * Extend a booking series by adding more instances
  * This adds bookings from the current series end date to the new end date
  */
@@ -447,5 +524,6 @@ module.exports = {
     createSeries,
     updateSeries,
     deleteSeries,
-    extendSeries
+    extendSeries,
+    previewExtendSeries
 };

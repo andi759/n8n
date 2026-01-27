@@ -38,3 +38,10 @@ export const extendSeries = async (id, newEndDate, excludedDates = []) => {
   });
   return response.data;
 };
+
+export const previewExtendSeries = async (id, newEndDate) => {
+  const response = await api.post(`/booking-series/${id}/extend/preview`, {
+    new_end_date: newEndDate
+  });
+  return response.data;
+};

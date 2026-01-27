@@ -26,11 +26,11 @@ import {
 import { Delete, Edit, Refresh, MoreTime } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { getAllBookings, deleteBooking } from '../services/bookingService';
-import { deleteSeries, extendSeries } from '../services/seriesService';
+import { deleteSeries, extendSeries, previewExtendSeries } from '../services/seriesService';
 import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
 import { getAllSpecialties } from '../services/specialtyService';
-import { format, parse } from 'date-fns';
+import { format, parse, addMonths } from 'date-fns';
 
 const SESSION_OPTIONS = [
   { value: '', label: 'All Sessions' },
@@ -97,6 +97,8 @@ function BookingList() {
   const [extendEndDate, setExtendEndDate] = useState(null);
   const [extendError, setExtendError] = useState('');
   const [extendLoading, setExtendLoading] = useState(false);
+  const [extendPreview, setExtendPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     loadClinics();
