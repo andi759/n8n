@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     capacity INTEGER,
     description TEXT,
     equipment TEXT DEFAULT '[]',
+    hr_number VARCHAR(255),
     is_active INTEGER DEFAULT 1,
     UNIQUE(clinic_id, room_number)
 );

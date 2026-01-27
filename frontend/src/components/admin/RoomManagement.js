@@ -58,6 +58,7 @@ function RoomManagement() {
     capacity: 1,
     description: '',
     equipment: [],
+    hr_number: '',
     is_active: 1,
   });
   const [error, setError] = useState('');
@@ -94,6 +95,7 @@ function RoomManagement() {
         capacity: room.capacity || 1,
         description: room.description || '',
         equipment: room.equipment ? JSON.parse(room.equipment) : [],
+        hr_number: room.hr_number || '',
         is_active: room.is_active,
       });
     } else {
@@ -106,6 +108,7 @@ function RoomManagement() {
         capacity: 1,
         description: '',
         equipment: [],
+        hr_number: '',
         is_active: 1,
       });
     }
@@ -164,6 +167,7 @@ function RoomManagement() {
             <TableCell>Clinic</TableCell>
             <TableCell>Room Number</TableCell>
             <TableCell>Room Name</TableCell>
+            <TableCell>HR Number</TableCell>
             <TableCell>Type</TableCell>
             <TableCell>Capacity</TableCell>
             <TableCell>Equipment</TableCell>
@@ -177,6 +181,7 @@ function RoomManagement() {
               <TableCell>{room.clinic_name}</TableCell>
               <TableCell>{room.room_number}</TableCell>
               <TableCell>{room.room_name}</TableCell>
+              <TableCell>{room.hr_number || '-'}</TableCell>
               <TableCell>{room.room_type_name || '-'}</TableCell>
               <TableCell>{room.capacity || '-'}</TableCell>
               <TableCell>
@@ -244,6 +249,14 @@ function RoomManagement() {
                 placeholder="e.g., Consultation Room 1"
               />
             </Box>
+
+            <TextField
+              label="HR Number"
+              fullWidth
+              value={formData.hr_number}
+              onChange={(e) => handleChange('hr_number', e.target.value)}
+              placeholder="e.g., HR-12345"
+            />
 
             <TextField
               select

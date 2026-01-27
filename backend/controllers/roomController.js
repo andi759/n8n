@@ -67,7 +67,7 @@ async function getRoom(req, res) {
  */
 async function createRoom(req, res) {
     try {
-        const { clinic_id, room_number, room_name, room_type_id, capacity, description, equipment } = req.body;
+        const { clinic_id, room_number, room_name, room_type_id, capacity, description, equipment, hr_number } = req.body;
 
         if (!clinic_id || !room_number || !room_name) {
             return res.status(400).json({ error: 'clinic_id, room_number and room_name are required' });
@@ -76,9 +76,9 @@ async function createRoom(req, res) {
         const equipmentJson = equipment ? JSON.stringify(equipment) : '[]';
 
         const result = await db.run(`
-            INSERT INTO rooms (clinic_id, room_number, room_name, room_type_id, capacity, description, equipment)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [clinic_id, room_number, room_name, room_type_id, capacity, description, equipmentJson]);
+            INSERT INTO rooms (clinic_id, room_number, room_name, room_type_id, capacity, description, equipment, hr_number)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `, [clinic_id, room_number, room_name, room_type_id, capacity, description, equipmentJson, hr_number]);
 
         const room = await db.get('SELECT * FROM rooms WHERE id = ?', [result.id]);
         res.status(201).json(room);
@@ -98,7 +98,7 @@ async function createRoom(req, res) {
 async function updateRoom(req, res) {
     try {
         const { id } = req.params;
-        const { room_number, room_name, room_type_id, capacity, description, equipment, is_active } = req.body;
+        const { room_number, room_name, room_type_id, capacity, description, equipment, hr_number, is_active } = req.body;
 
         const existing = await db.get('SELECT * FROM rooms WHERE id = ?', [id]);
         if (!existing) {
@@ -115,9 +115,10 @@ async function updateRoom(req, res) {
                 capacity = COALESCE(?, capacity),
                 description = COALESCE(?, description),
                 equipment = COALESCE(?, equipment),
+                hr_number = COALESCE(?, hr_number),
                 is_active = COALESCE(?, is_active)
             WHERE id = ?
-        `, [room_number, room_name, room_type_id, capacity, description, equipmentJson, is_active, id]);
+        `, [room_number, room_name, room_type_id, capacity, description, equipmentJson, hr_number, is_active, id]);
 
         const room = await db.get('SELECT * FROM rooms WHERE id = ?', [id]);
         res.json(room);

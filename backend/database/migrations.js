@@ -118,6 +118,16 @@ async function runMigrations() {
             }
         }
 
+        // Add hr_number column to rooms table
+        try {
+            await db.exec(`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS hr_number VARCHAR(255)`);
+            migrations.push('Checked hr_number column on rooms');
+        } catch (err) {
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+                console.error('Migration error (rooms.hr_number):', err.message);
+            }
+        }
+
         // Insert default specialties if table is empty
         try {
             const count = await db.get('SELECT COUNT(*) as count FROM specialties');
