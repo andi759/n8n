@@ -218,14 +218,43 @@ function BookingList() {
 
   const handleExtendClick = (booking) => {
     setBookingToExtend(booking);
-    setExtendEndDate(null);
+    // Default to 12 months from now
+    setExtendEndDate(addMonths(new Date(), 12));
     setExtendError('');
+    setExtendPreview(null);
     setExtendDialogOpen(true);
+  };
+
+  const handleExtendPreview = async () => {
+    if (!extendEndDate) {
+      setExtendError('Please select a new end date');
+      return;
+    }
+
+    setPreviewLoading(true);
+    setExtendError('');
+
+    try {
+      const newEndDateStr = format(extendEndDate, 'yyyy-MM-dd');
+      const preview = await previewExtendSeries(bookingToExtend.series_id, newEndDateStr);
+      setExtendPreview(preview);
+    } catch (error) {
+      console.error('Failed to preview extension:', error);
+      setExtendError(error.response?.data?.error || 'Failed to preview extension');
+      setExtendPreview(null);
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const handleExtendConfirm = async () => {
     if (!extendEndDate) {
       setExtendError('Please select a new end date');
+      return;
+    }
+
+    if (!extendPreview) {
+      setExtendError('Please preview the extension first');
       return;
     }
 
@@ -238,6 +267,7 @@ function BookingList() {
       setExtendDialogOpen(false);
       setBookingToExtend(null);
       setExtendEndDate(null);
+      setExtendPreview(null);
       loadBookings();
     } catch (error) {
       console.error('Failed to extend series:', error);
@@ -252,6 +282,7 @@ function BookingList() {
     setBookingToExtend(null);
     setExtendEndDate(null);
     setExtendError('');
+    setExtendPreview(null);
   };
 
   const getStatusColor = (status) => {
@@ -572,7 +603,7 @@ function BookingList() {
       </Dialog>
 
       {/* Extend Series Dialog */}
-      <Dialog open={extendDialogOpen} onClose={handleExtendCancel} maxWidth="sm" fullWidth>
+      <Dialog open={extendDialogOpen} onClose={handleExtendCancel} maxWidth="md" fullWidth>
         <DialogTitle>Extend Recurring Series</DialogTitle>
         <DialogContent>
           {bookingToExtend && (
@@ -598,20 +629,74 @@ function BookingList() {
                   </Typography>
                 )}
               </Box>
-              <DatePicker
-                label="New End Date"
-                value={extendEndDate}
-                onChange={(date) => setExtendEndDate(date)}
-                format="dd/MM/yyyy"
-                minDate={new Date()}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    required: true,
-                    helperText: 'Select the new end date for the series'
-                  }
-                }}
-              />
+
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 2 }}>
+                <DatePicker
+                  label="New End Date"
+                  value={extendEndDate}
+                  onChange={(date) => {
+                    setExtendEndDate(date);
+                    setExtendPreview(null); // Clear preview when date changes
+                  }}
+                  format="dd/MM/yyyy"
+                  minDate={new Date()}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      required: true,
+                      helperText: 'Default: 12 months from today'
+                    }
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  onClick={handleExtendPreview}
+                  disabled={previewLoading || !extendEndDate}
+                  sx={{ mt: 1, minWidth: 120 }}
+                >
+                  {previewLoading ? 'Loading...' : 'Preview'}
+                </Button>
+              </Box>
+
+              {extendPreview && (
+                <Box sx={{ mt: 2 }}>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Current last booking:</strong> {formatDateUK(extendPreview.current_last_date)}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>New bookings to be created:</strong> {extendPreview.instances_to_create}
+                    </Typography>
+                  </Alert>
+
+                  {extendPreview.conflicts && extendPreview.conflicts.length > 0 && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                        {extendPreview.conflicts.length} date(s) will be skipped due to conflicts:
+                      </Typography>
+                      <Box sx={{ maxHeight: 150, overflow: 'auto' }}>
+                        {extendPreview.conflicts.map((conflict, index) => (
+                          <Typography key={index} variant="body2" sx={{ ml: 1 }}>
+                            • {formatDateUK(conflict.date)} - {getDayOfWeek(conflict.date)}
+                            {conflict.conflicting_booking && (
+                              <span style={{ color: '#666' }}>
+                                {' '}(booked by {conflict.conflicting_booking.specialty || 'another booking'})
+                              </span>
+                            )}
+                          </Typography>
+                        ))}
+                      </Box>
+                    </Alert>
+                  )}
+
+                  {extendPreview.instances_to_create === 0 && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      No new bookings can be created. All dates have conflicts or the end date is too soon.
+                    </Alert>
+                  )}
+                </Box>
+              )}
+
               {extendError && (
                 <Alert severity="error" sx={{ mt: 2 }}>
                   {extendError}
@@ -628,9 +713,9 @@ function BookingList() {
             onClick={handleExtendConfirm}
             color="primary"
             variant="contained"
-            disabled={extendLoading || !extendEndDate}
+            disabled={extendLoading || !extendEndDate || !extendPreview || extendPreview.instances_to_create === 0}
           >
-            {extendLoading ? 'Extending...' : 'Extend Series'}
+            {extendLoading ? 'Extending...' : `Extend Series (${extendPreview?.instances_to_create || 0} bookings)`}
           </Button>
         </DialogActions>
       </Dialog>
