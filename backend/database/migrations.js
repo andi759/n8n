@@ -105,6 +105,19 @@ async function runMigrations() {
             }
         }
 
+        // Extend clinic_code column to VARCHAR(255) in all tables
+        try {
+            await db.exec(`ALTER TABLE clinics ALTER COLUMN clinic_code TYPE VARCHAR(255)`);
+            await db.exec(`ALTER TABLE bookings ALTER COLUMN clinic_code TYPE VARCHAR(255)`);
+            await db.exec(`ALTER TABLE booking_series ALTER COLUMN clinic_code TYPE VARCHAR(255)`);
+            migrations.push('Extended clinic_code column to 255 characters');
+        } catch (err) {
+            // Ignore if already the correct type
+            if (!err.message.includes('already') && !err.message.includes('nothing to alter')) {
+                console.error('Migration error (clinic_code extension):', err.message);
+            }
+        }
+
         // Insert default specialties if table is empty
         try {
             const count = await db.get('SELECT COUNT(*) as count FROM specialties');

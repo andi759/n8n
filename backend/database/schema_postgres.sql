@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS clinics (
     id SERIAL PRIMARY KEY,
     clinic_name VARCHAR(255) UNIQUE NOT NULL,
-    clinic_code VARCHAR(50) UNIQUE NOT NULL,
+    clinic_code VARCHAR(255) UNIQUE NOT NULL,
     description TEXT,
     is_active INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS booking_series (
     duration_minutes INTEGER NOT NULL,
     session VARCHAR(20) DEFAULT 'all_day' CHECK(session IN ('all_day', 'am', 'pm')),
     specialty VARCHAR(255),
-    clinic_code VARCHAR(50),
+    clinic_code VARCHAR(255),
     doctor_name VARCHAR(255),
     notes TEXT,
     color VARCHAR(50) DEFAULT '#1976d2',
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     duration_minutes INTEGER NOT NULL,
     session VARCHAR(20) DEFAULT 'all_day' CHECK(session IN ('all_day', 'am', 'pm')),
     specialty VARCHAR(255),
-    clinic_code VARCHAR(50),
+    clinic_code VARCHAR(255),
     doctor_name VARCHAR(255),
     notes TEXT,
     color VARCHAR(50) DEFAULT '#1976d2',
