@@ -21,7 +21,7 @@ async function getAllRooms(req, res) {
             params.push(clinic_id);
         }
 
-        if (is_active !== undefined) {
+        if (is_active !== undefined && is_active !== 'all') {
             query += ' AND r.is_active = ?';
             params.push(is_active === 'true' ? 1 : 0);
         }
