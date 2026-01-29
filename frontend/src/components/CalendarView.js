@@ -89,6 +89,10 @@ function CalendarView() {
       if (!filteredRooms.find(r => r.id === parseInt(filters.room_id))) {
         setFilters(prev => ({ ...prev, room_id: '' }));
       }
+      // Also clear room week selected room if it's not in the filtered clinic
+      if (selectedRoomId && !filteredRooms.find(r => r.id === parseInt(selectedRoomId))) {
+        setSelectedRoomId('');
+      }
     } else {
       setRooms(allRooms);
     }
@@ -621,6 +625,21 @@ function CalendarView() {
                 <Box sx={{ flexGrow: 1 }} />
                 <TextField
                   select
+                  label="Clinic"
+                  size="small"
+                  value={filters.clinic_id}
+                  onChange={(e) => handleFilterChange('clinic_id', e.target.value)}
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="">All Clinics</MenuItem>
+                  {clinics.map(clinic => (
+                    <MenuItem key={clinic.id} value={clinic.id}>
+                      {clinic.clinic_name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
                   label="Room"
                   size="small"
                   value={selectedRoomId}
@@ -628,7 +647,7 @@ function CalendarView() {
                   sx={{ minWidth: 200 }}
                 >
                   <MenuItem value="">Select a room...</MenuItem>
-                  {allRooms.map(room => (
+                  {rooms.map(room => (
                     <MenuItem key={room.id} value={room.id}>
                       {room.room_name}
                     </MenuItem>
