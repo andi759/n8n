@@ -22,7 +22,10 @@ import { getAllSpecialties } from '../services/specialtyService';
 import {
   format,
   addDays,
+  addWeeks,
   subDays,
+  subWeeks,
+  startOfWeek,
 } from 'date-fns';
 
 // Time slots from 08:00 to 17:30 in 30-min increments
@@ -53,6 +56,8 @@ const getSessionLabel = (session) => {
 
 function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState('day');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
   const [bookings, setBookings] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -75,7 +80,7 @@ function CalendarView() {
 
   useEffect(() => {
     loadBookings();
-  }, [currentDate, filters]);
+  }, [currentDate, viewMode, filters, selectedRoomId]);
 
   useEffect(() => {
     if (filters.clinic_id) {
@@ -117,9 +122,19 @@ function CalendarView() {
     }
   };
 
+  // Get the Monday of the current week
+  const getWeekStart = (date) => {
+    return startOfWeek(date, { weekStartsOn: 1 }); // Monday
+  };
+
   const dateRange = useMemo(() => {
+    if (viewMode === 'room_week') {
+      const weekStart = getWeekStart(currentDate);
+      const weekEnd = addDays(weekStart, 5); // Mon-Sat
+      return { start: weekStart, end: weekEnd };
+    }
     return { start: currentDate, end: currentDate };
-  }, [currentDate]);
+  }, [currentDate, viewMode]);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -128,8 +143,14 @@ function CalendarView() {
         start_date: format(dateRange.start, 'yyyy-MM-dd'),
         end_date: format(dateRange.end, 'yyyy-MM-dd'),
       };
-      if (filters.clinic_id) params.clinic_id = filters.clinic_id;
-      if (filters.room_id) params.room_id = filters.room_id;
+
+      if (viewMode === 'room_week' && selectedRoomId) {
+        params.room_id = selectedRoomId;
+      } else {
+        if (filters.clinic_id) params.clinic_id = filters.clinic_id;
+        if (filters.room_id) params.room_id = filters.room_id;
+      }
+
       if (filters.specialty) params.specialty = filters.specialty;
       if (!filters.includeCancelled) params.status = 'confirmed';
 
@@ -147,16 +168,28 @@ function CalendarView() {
   };
 
   const handlePrevious = () => {
-    setCurrentDate(prev => subDays(prev, 1));
+    if (viewMode === 'room_week') {
+      setCurrentDate(prev => subWeeks(prev, 1));
+    } else {
+      setCurrentDate(prev => subDays(prev, 1));
+    }
   };
 
   const handleNext = () => {
-    setCurrentDate(prev => addDays(prev, 1));
+    if (viewMode === 'room_week') {
+      setCurrentDate(prev => addWeeks(prev, 1));
+    } else {
+      setCurrentDate(prev => addDays(prev, 1));
+    }
   };
 
   const handleToday = () => setCurrentDate(new Date());
 
   const getViewTitle = () => {
+    if (viewMode === 'room_week') {
+      const weekStart = getWeekStart(currentDate);
+      return `Week Beginning ${format(weekStart, 'EEEE d MMMM yyyy')}`;
+    }
     return format(currentDate, 'EEEE dd MMMM yyyy');
   };
 
@@ -179,6 +212,57 @@ function CalendarView() {
         return a.room_number.localeCompare(b.room_number);
       });
   };
+
+  // Render booking block content (shared between both views)
+  const renderBookingContent = (booking, isCancelled) => (
+    <>
+      <Typography sx={{ fontWeight: 'bold', fontSize: '0.75rem', lineHeight: 1.2 }}>
+        {booking.specialty || 'No specialty'}
+      </Typography>
+      {booking.created_by_name && (
+        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+          User: {booking.created_by_name}
+        </Typography>
+      )}
+      <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+        Ad hoc room?: {booking.is_ad_hoc ? 'Yes' : 'No'}
+      </Typography>
+      {booking.doctor_name && (
+        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+          Doctor/Nurse
+        </Typography>
+      )}
+      {booking.doctor_name && (
+        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+          Name: {booking.doctor_name}
+        </Typography>
+      )}
+      {booking.clinic_code && (
+        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+          Epic Clinic Code: {booking.clinic_code}
+        </Typography>
+      )}
+      <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+        Nursing Support: {booking.nursing_support ? 'Yes' : 'No'}
+      </Typography>
+      <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+        Specialty: {booking.specialty || '-'}
+      </Typography>
+      <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+        User: {booking.user_type || 'Consultant'}
+      </Typography>
+      {booking.notes && (
+        <Typography sx={{ fontSize: '0.6rem', lineHeight: 1.3, fontStyle: 'italic', opacity: 0.9 }}>
+          {booking.notes}
+        </Typography>
+      )}
+      {isCancelled && (
+        <Typography sx={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#ffcdd2' }}>
+          CANCELLED
+        </Typography>
+      )}
+    </>
+  );
 
   // Render the day view with time slots and room columns
   const renderDayView = () => {
@@ -314,37 +398,7 @@ function CalendarView() {
                         flexDirection: 'column',
                       }}
                     >
-                      <Typography sx={{ fontWeight: 'bold', fontSize: '0.75rem', lineHeight: 1.2 }}>
-                        {booking.specialty || 'No specialty'}
-                      </Typography>
-                      {booking.doctor_name && (
-                        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
-                          Name: {booking.doctor_name}
-                        </Typography>
-                      )}
-                      {booking.clinic_code && (
-                        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
-                          Clinic Code: {booking.clinic_code}
-                        </Typography>
-                      )}
-                      <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
-                        Session: {getSessionLabel(booking.session)}
-                      </Typography>
-                      {booking.clinic_name && (
-                        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
-                          Clinic: {booking.clinic_name}
-                        </Typography>
-                      )}
-                      {booking.notes && (
-                        <Typography sx={{ fontSize: '0.6rem', lineHeight: 1.3, fontStyle: 'italic', opacity: 0.9 }}>
-                          {booking.notes}
-                        </Typography>
-                      )}
-                      {isCancelled && (
-                        <Typography sx={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#ffcdd2' }}>
-                          CANCELLED
-                        </Typography>
-                      )}
+                      {renderBookingContent(booking, isCancelled)}
                     </Paper>
                   );
                 })}
@@ -355,6 +409,167 @@ function CalendarView() {
       </Box>
     );
   };
+
+  // Render the room week view - single room, days as columns
+  const renderRoomWeekView = () => {
+    const weekStart = getWeekStart(currentDate);
+    const days = [];
+    for (let i = 0; i < 6; i++) { // Mon-Sat
+      days.push(addDays(weekStart, i));
+    }
+
+    const selectedRoom = allRooms.find(r => r.id === parseInt(selectedRoomId));
+
+    if (!selectedRoomId) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary">
+            Please select a room to view its weekly schedule
+          </Typography>
+        </Box>
+      );
+    }
+
+    const totalHeight = TIME_SLOTS.length * ROW_HEIGHT;
+    const timeColWidth = 60;
+    const dayColWidth = 160;
+
+    return (
+      <Box sx={{ overflowX: 'auto' }}>
+        {/* Day headers */}
+        <Box sx={{ display: 'flex', minWidth: timeColWidth + days.length * dayColWidth }}>
+          {/* Empty corner for time column */}
+          <Box sx={{ width: timeColWidth, minWidth: timeColWidth, flexShrink: 0 }} />
+
+          {/* Day column headers */}
+          {days.map(day => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const isCurrentDay = format(new Date(), 'yyyy-MM-dd') === dateStr;
+
+            return (
+              <Box
+                key={dateStr}
+                sx={{
+                  width: dayColWidth,
+                  minWidth: dayColWidth,
+                  flexShrink: 0,
+                  textAlign: 'center',
+                  p: 1,
+                  borderBottom: '2px solid #9c27b0',
+                  borderLeft: '1px solid #e0e0e0',
+                  backgroundColor: isCurrentDay ? '#e8f5e9' : '#f3e5f5',
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '0.8rem', color: isCurrentDay ? '#2e7d32' : '#6a1b9a' }}>
+                  {format(day, 'EEE dd/MM/yyyy')}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Box>
+
+        {/* Time grid */}
+        <Box sx={{ display: 'flex', minWidth: timeColWidth + days.length * dayColWidth }}>
+          {/* Time labels */}
+          <Box sx={{ width: timeColWidth, minWidth: timeColWidth, flexShrink: 0, position: 'relative', height: totalHeight }}>
+            {TIME_SLOTS.map((time, idx) => (
+              <Box
+                key={time}
+                sx={{
+                  position: 'absolute',
+                  top: idx * ROW_HEIGHT,
+                  height: ROW_HEIGHT,
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  pr: 1,
+                  borderBottom: '1px solid #f0f0f0',
+                  fontSize: '0.75rem',
+                  color: '#666',
+                  fontWeight: time.endsWith(':00') ? 'bold' : 'normal',
+                }}
+              >
+                {time}
+              </Box>
+            ))}
+          </Box>
+
+          {/* Day columns */}
+          {days.map(day => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const dayBookings = bookings.filter(b => b.booking_date === dateStr);
+
+            return (
+              <Box
+                key={dateStr}
+                sx={{
+                  width: dayColWidth,
+                  minWidth: dayColWidth,
+                  flexShrink: 0,
+                  position: 'relative',
+                  height: totalHeight,
+                  borderLeft: '1px solid #e0e0e0',
+                }}
+              >
+                {/* Grid lines */}
+                {TIME_SLOTS.map((time, idx) => (
+                  <Box
+                    key={time}
+                    sx={{
+                      position: 'absolute',
+                      top: idx * ROW_HEIGHT,
+                      height: ROW_HEIGHT,
+                      width: '100%',
+                      borderBottom: time.endsWith(':00') ? '1px solid #e0e0e0' : '1px solid #f5f5f5',
+                    }}
+                  />
+                ))}
+
+                {/* Booking blocks */}
+                {dayBookings.map(booking => {
+                  const startIdx = timeToSlotIndex(booking.start_time);
+                  const endIdx = timeToSlotIndex(booking.end_time);
+                  const spanSlots = Math.max(endIdx - startIdx, 1);
+                  const top = startIdx * ROW_HEIGHT;
+                  const height = spanSlots * ROW_HEIGHT;
+                  const isCancelled = booking.status === 'cancelled';
+                  const bgColor = isCancelled ? '#bdbdbd' : (booking.color || '#1976d2');
+
+                  return (
+                    <Paper
+                      key={booking.id}
+                      elevation={1}
+                      sx={{
+                        position: 'absolute',
+                        top: top + 1,
+                        left: 2,
+                        right: 2,
+                        height: height - 2,
+                        backgroundColor: bgColor,
+                        color: 'white',
+                        opacity: isCancelled ? 0.7 : 1,
+                        borderRadius: 1,
+                        p: 0.75,
+                        overflow: 'hidden',
+                        zIndex: 2,
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}
+                    >
+                      {renderBookingContent(booking, isCancelled)}
+                    </Paper>
+                  );
+                })}
+              </Box>
+            );
+          })}
+        </Box>
+      </Box>
+    );
+  };
+
+  const selectedRoomName = allRooms.find(r => r.id === parseInt(selectedRoomId))?.room_name;
 
   return (
     <Container maxWidth={false} sx={{ maxWidth: '100%' }}>
@@ -368,6 +583,18 @@ function CalendarView() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+            <TextField
+              select
+              label="View"
+              size="small"
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              sx={{ minWidth: 140 }}
+            >
+              <MenuItem value="day">Daily</MenuItem>
+              <MenuItem value="room_week">Room Week</MenuItem>
+            </TextField>
+
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Button variant="text" size="small" onClick={handlePrevious} sx={{ minWidth: 'auto' }}>
                 &laquo; Prev
@@ -389,58 +616,83 @@ function CalendarView() {
               {getViewTitle()}
             </Typography>
 
-            <Box sx={{ flexGrow: 1 }} />
+            {viewMode === 'room_week' && (
+              <>
+                <Box sx={{ flexGrow: 1 }} />
+                <TextField
+                  select
+                  label="Room"
+                  size="small"
+                  value={selectedRoomId}
+                  onChange={(e) => setSelectedRoomId(e.target.value)}
+                  sx={{ minWidth: 200 }}
+                >
+                  <MenuItem value="">Select a room...</MenuItem>
+                  {allRooms.map(room => (
+                    <MenuItem key={room.id} value={room.id}>
+                      {room.room_name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </>
+            )}
 
-            <TextField
-              select
-              label="Clinic"
-              size="small"
-              value={filters.clinic_id}
-              onChange={(e) => handleFilterChange('clinic_id', e.target.value)}
-              sx={{ minWidth: 150 }}
-            >
-              <MenuItem value="">All Clinics</MenuItem>
-              {clinics.map(clinic => (
-                <MenuItem key={clinic.id} value={clinic.id}>
-                  {clinic.clinic_name}
-                </MenuItem>
-              ))}
-            </TextField>
+            {viewMode === 'day' && (
+              <>
+                <Box sx={{ flexGrow: 1 }} />
 
-            <TextField
-              select
-              label="Room"
-              size="small"
-              value={filters.room_id}
-              onChange={(e) => handleFilterChange('room_id', e.target.value)}
-              sx={{ minWidth: 150 }}
-            >
-              <MenuItem value="">All Rooms</MenuItem>
-              {rooms.map(room => (
-                <MenuItem key={room.id} value={room.id}>
-                  {room.room_name}
-                </MenuItem>
-              ))}
-            </TextField>
+                <TextField
+                  select
+                  label="Clinic"
+                  size="small"
+                  value={filters.clinic_id}
+                  onChange={(e) => handleFilterChange('clinic_id', e.target.value)}
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="">All Clinics</MenuItem>
+                  {clinics.map(clinic => (
+                    <MenuItem key={clinic.id} value={clinic.id}>
+                      {clinic.clinic_name}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
-            <TextField
-              select
-              label="Specialty"
-              size="small"
-              value={filters.specialty}
-              onChange={(e) => handleFilterChange('specialty', e.target.value)}
-              sx={{ minWidth: 150 }}
-            >
-              <MenuItem value="">All Specialties</MenuItem>
-              {specialties.map(specialty => (
-                <MenuItem key={specialty.id} value={specialty.name}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 12, height: 12, borderRadius: '2px', backgroundColor: specialty.color }} />
-                    {specialty.name}
-                  </Box>
-                </MenuItem>
-              ))}
-            </TextField>
+                <TextField
+                  select
+                  label="Room"
+                  size="small"
+                  value={filters.room_id}
+                  onChange={(e) => handleFilterChange('room_id', e.target.value)}
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="">All Rooms</MenuItem>
+                  {rooms.map(room => (
+                    <MenuItem key={room.id} value={room.id}>
+                      {room.room_name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  label="Specialty"
+                  size="small"
+                  value={filters.specialty}
+                  onChange={(e) => handleFilterChange('specialty', e.target.value)}
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="">All Specialties</MenuItem>
+                  {specialties.map(specialty => (
+                    <MenuItem key={specialty.id} value={specialty.name}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ width: 12, height: 12, borderRadius: '2px', backgroundColor: specialty.color }} />
+                        {specialty.name}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </>
+            )}
 
             <FormControlLabel
               control={
@@ -458,11 +710,20 @@ function CalendarView() {
 
       {/* Calendar */}
       <Card>
+        {viewMode === 'room_week' && selectedRoomName && (
+          <Box sx={{ p: 1.5, backgroundColor: '#f3e5f5', borderBottom: '2px solid #9c27b0', textAlign: 'right' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#6a1b9a' }}>
+              {selectedRoomName}
+            </Typography>
+          </Box>
+        )}
         <CardContent sx={{ p: 1, overflow: 'auto' }}>
           {loading ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <Typography>Loading...</Typography>
             </Box>
+          ) : viewMode === 'room_week' ? (
+            renderRoomWeekView()
           ) : (
             renderDayView()
           )}
