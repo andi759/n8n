@@ -13,6 +13,12 @@ import {
   Checkbox,
   Grid,
   Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -25,23 +31,17 @@ import { getAllClinics } from '../services/clinicService';
 import { getAllSpecialties } from '../services/specialtyService';
 import {
   format,
-  startOfMonth,
-  endOfMonth,
   startOfWeek,
   endOfWeek,
   addDays,
   addWeeks,
-  addMonths,
   subDays,
   subWeeks,
-  subMonths,
-  isSameMonth,
   isToday,
   getDay,
 } from 'date-fns';
 
 const VIEW_OPTIONS = [
-  { value: 'month', label: 'Monthly' },
   { value: 'week', label: 'Weekly' },
   { value: 'day', label: 'Daily' },
 ];
@@ -64,7 +64,7 @@ const getSunday = (date) => {
 
 function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState('month');
+  const [viewMode, setViewMode] = useState('day');
   const [bookings, setBookings] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -140,13 +140,9 @@ function CalendarView() {
         end = currentDate;
         break;
       case 'week':
+      default:
         start = getSunday(currentDate);
         end = addDays(start, 6);
-        break;
-      case 'month':
-      default:
-        start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 0 });
-        end = endOfWeek(endOfMonth(currentDate), { weekStartsOn: 0 });
         break;
     }
 
@@ -185,11 +181,8 @@ function CalendarView() {
         setCurrentDate(prev => subDays(prev, 1));
         break;
       case 'week':
-        setCurrentDate(prev => subWeeks(prev, 1));
-        break;
-      case 'month':
       default:
-        setCurrentDate(prev => subMonths(prev, 1));
+        setCurrentDate(prev => subWeeks(prev, 1));
         break;
     }
   };
@@ -200,11 +193,8 @@ function CalendarView() {
         setCurrentDate(prev => addDays(prev, 1));
         break;
       case 'week':
-        setCurrentDate(prev => addWeeks(prev, 1));
-        break;
-      case 'month':
       default:
-        setCurrentDate(prev => addMonths(prev, 1));
+        setCurrentDate(prev => addWeeks(prev, 1));
         break;
     }
   };
@@ -225,26 +215,11 @@ function CalendarView() {
       case 'day':
         return format(currentDate, 'EEEE, dd MMMM yyyy');
       case 'week':
+      default:
         const weekStart = getSunday(currentDate);
         const weekEnd = addDays(weekStart, 6);
         return `${format(weekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`;
-      case 'month':
-      default:
-        return format(currentDate, 'MMMM yyyy');
     }
-  };
-
-  // Generate calendar days for month view
-  const getMonthDays = () => {
-    const days = [];
-    let day = dateRange.start;
-
-    while (day <= dateRange.end) {
-      days.push(day);
-      day = addDays(day, 1);
-    }
-
-    return days;
   };
 
   // Generate days for week view
@@ -260,94 +235,77 @@ function CalendarView() {
     return days;
   };
 
-  // Render an expanded booking card with all details
-  const renderBookingCard = (booking, compact = false) => {
+  // Get rooms that have bookings for a given date, plus any filtered rooms
+  const getRoomsForDate = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayBookings = bookings.filter(b => b.booking_date === dateStr);
+
+    // Get unique room IDs from bookings
+    const bookedRoomIds = new Set(dayBookings.map(b => b.room_id));
+
+    // Get rooms to display - either filtered rooms or rooms with bookings
+    let displayRooms;
+    if (filters.room_id) {
+      displayRooms = rooms.filter(r => r.id === parseInt(filters.room_id));
+    } else if (filters.clinic_id) {
+      displayRooms = rooms.filter(r => bookedRoomIds.has(r.id));
+    } else {
+      displayRooms = allRooms.filter(r => bookedRoomIds.has(r.id));
+    }
+
+    return displayRooms.sort((a, b) => {
+      if (a.clinic_name !== b.clinic_name) return a.clinic_name.localeCompare(b.clinic_name);
+      return a.room_number.localeCompare(b.room_number);
+    });
+  };
+
+  // Render a booking block with all details
+  const renderBookingBlock = (booking) => {
     const isCancelled = booking.status === 'cancelled';
     const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
 
     return (
       <Paper
         key={booking.id}
-        elevation={1}
+        elevation={2}
         sx={{
-          p: compact ? 0.75 : 1,
-          mb: 0.5,
+          p: 1.5,
+          mb: 1,
           backgroundColor: bgColor,
           color: 'white',
-          opacity: isCancelled ? 0.8 : 1,
+          opacity: isCancelled ? 0.7 : 1,
           borderRadius: 1,
+          minHeight: 80,
         }}
       >
-        <Typography
-          variant="body2"
-          sx={{
-            fontWeight: 'bold',
-            fontSize: compact ? '0.7rem' : '0.8rem',
-            textDecoration: isCancelled ? 'line-through' : 'none',
-            lineHeight: 1.2,
-          }}
-        >
-          {booking.room_name}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            display: 'block',
-            fontSize: compact ? '0.6rem' : '0.7rem',
-            lineHeight: 1.1,
-            opacity: 0.95,
-          }}
-        >
+        <Typography variant="body2" sx={{ fontWeight: 'bold', lineHeight: 1.3, textDecoration: isCancelled ? 'line-through' : 'none' }}>
           {booking.specialty || 'No specialty'}
         </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            display: 'block',
-            fontSize: compact ? '0.6rem' : '0.7rem',
-            lineHeight: 1.1,
-            opacity: 0.95,
-          }}
-        >
-          {getSessionLabel(booking.session)}
+        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.75rem', lineHeight: 1.3, opacity: 0.95 }}>
+          {getSessionLabel(booking.session)} ({booking.start_time} - {booking.end_time})
         </Typography>
         {booking.doctor_name && (
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              fontSize: compact ? '0.55rem' : '0.65rem',
-              lineHeight: 1.1,
-              opacity: 0.9,
-            }}
-          >
+          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.3, opacity: 0.9 }}>
             Dr: {booking.doctor_name}
           </Typography>
         )}
         {booking.clinic_code && (
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              fontSize: compact ? '0.55rem' : '0.65rem',
-              lineHeight: 1.1,
-              opacity: 0.9,
-            }}
-          >
+          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.3, opacity: 0.9 }}>
             Code: {booking.clinic_code}
           </Typography>
         )}
+        {booking.clinic_name && (
+          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.3, opacity: 0.9 }}>
+            Clinic: {booking.clinic_name}
+          </Typography>
+        )}
+        {booking.notes && (
+          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.3, opacity: 0.8, fontStyle: 'italic', mt: 0.5 }}>
+            {booking.notes}
+          </Typography>
+        )}
         {isCancelled && (
-          <Typography
-            variant="caption"
-            sx={{
-              display: 'block',
-              fontSize: compact ? '0.6rem' : '0.7rem',
-              fontWeight: 'bold',
-              color: '#ffcdd2',
-              lineHeight: 1.1,
-            }}
-          >
+          <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: '#ffcdd2', mt: 0.5 }}>
             CANCELLED
           </Typography>
         )}
@@ -355,67 +313,113 @@ function CalendarView() {
     );
   };
 
-  // Render month view
-  const renderMonthView = () => {
-    const days = getMonthDays();
-    const weeks = [];
+  // Render day view - rooms as columns, sessions as rows
+  const renderDayView = () => {
+    const dateStr = format(currentDate, 'yyyy-MM-dd');
+    const dayBookings = bookings.filter(b => b.booking_date === dateStr);
+    const displayRooms = getRoomsForDate(currentDate);
 
-    for (let i = 0; i < days.length; i += 7) {
-      weeks.push(days.slice(i, i + 7));
+    if (displayRooms.length === 0 && dayBookings.length === 0) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary">No bookings for this day</Typography>
+        </Box>
+      );
     }
 
+    const sessions = [
+      { key: 'all_day', label: 'All Day', time: '08:30 - 17:30' },
+      { key: 'am', label: 'AM', time: '08:30 - 12:30' },
+      { key: 'pm', label: 'PM', time: '13:30 - 17:30' },
+    ];
+
     return (
-      <Box>
-        {/* Day headers */}
-        <Grid container>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <Grid item xs key={day} sx={{ textAlign: 'center', py: 1, borderBottom: '1px solid #e0e0e0' }}>
-              <Typography variant="subtitle2" fontWeight="bold">{day}</Typography>
-            </Grid>
-          ))}
-        </Grid>
-
-        {/* Calendar grid */}
-        {weeks.map((week, weekIndex) => (
-          <Grid container key={weekIndex} sx={{ minHeight: '180px' }}>
-            {week.map(day => {
-              const dayBookings = getBookingsForDate(day);
-              const isCurrentMonth = isSameMonth(day, currentDate);
-              const isCurrentDay = isToday(day);
-
-              return (
-                <Grid
-                  item
-                  xs
-                  key={day.toISOString()}
+      <TableContainer component={Paper} elevation={0}>
+        <Table sx={{ tableLayout: 'fixed' }}>
+          <TableHead>
+            <TableRow>
+              <TableCell
+                sx={{
+                  width: 120,
+                  fontWeight: 'bold',
+                  backgroundColor: '#f5f5f5',
+                  borderRight: '2px solid #e0e0e0',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                }}
+              >
+                Session
+              </TableCell>
+              {displayRooms.map(room => (
+                <TableCell
+                  key={room.id}
+                  align="center"
                   sx={{
-                    border: '1px solid #e0e0e0',
-                    borderTop: 'none',
-                    borderLeft: 'none',
-                    p: 0.5,
-                    minHeight: '180px',
-                    backgroundColor: isCurrentDay ? 'rgba(25, 118, 210, 0.08)' : (isCurrentMonth ? 'white' : '#fafafa'),
+                    fontWeight: 'bold',
+                    backgroundColor: '#f5f5f5',
+                    borderRight: '1px solid #e0e0e0',
+                    minWidth: 180,
+                    p: 1,
                   }}
                 >
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: isCurrentDay ? 'bold' : 'normal',
-                      color: isCurrentMonth ? 'inherit' : '#9e9e9e',
-                      mb: 0.5,
-                    }}
-                  >
-                    {format(day, 'd')}
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    {room.room_name}
                   </Typography>
-                  <Box sx={{ maxHeight: '150px', overflow: 'auto' }}>
-                    {dayBookings.map(booking => renderBookingCard(booking, true))}
-                  </Box>
-                </Grid>
-              );
-            })}
-          </Grid>
-        ))}
-      </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {room.room_number}
+                  </Typography>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sessions.map(session => (
+              <TableRow key={session.key}>
+                <TableCell
+                  sx={{
+                    fontWeight: 'bold',
+                    backgroundColor: '#fafafa',
+                    borderRight: '2px solid #e0e0e0',
+                    verticalAlign: 'top',
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 1,
+                    p: 1.5,
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    {session.label}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {session.time}
+                  </Typography>
+                </TableCell>
+                {displayRooms.map(room => {
+                  const cellBookings = dayBookings.filter(
+                    b => b.room_id === room.id && b.session === session.key
+                  );
+
+                  return (
+                    <TableCell
+                      key={room.id}
+                      sx={{
+                        borderRight: '1px solid #e0e0e0',
+                        verticalAlign: 'top',
+                        p: 1,
+                        minHeight: 120,
+                        backgroundColor: cellBookings.length > 0 ? 'transparent' : '#fafafa',
+                      }}
+                    >
+                      {cellBookings.map(booking => renderBookingBlock(booking))}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     );
   };
 
@@ -449,6 +453,12 @@ function CalendarView() {
                     borderBottom: '1px solid #e0e0e0',
                     backgroundColor: isCurrentDay ? 'primary.main' : '#f5f5f5',
                     color: isCurrentDay ? 'white' : 'inherit',
+                    cursor: 'pointer',
+                    '&:hover': { opacity: 0.85 },
+                  }}
+                  onClick={() => {
+                    setCurrentDate(day);
+                    setViewMode('day');
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight="bold">
@@ -469,229 +479,13 @@ function CalendarView() {
                       No bookings
                     </Typography>
                   ) : (
-                    dayBookings.map(booking => {
-                      const isCancelled = booking.status === 'cancelled';
-                      const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
-
-                      return (
-                        <Paper
-                          key={booking.id}
-                          elevation={2}
-                          sx={{
-                            p: 1.5,
-                            mb: 1,
-                            backgroundColor: bgColor,
-                            color: 'white',
-                            opacity: isCancelled ? 0.8 : 1,
-                            borderRadius: 1,
-                          }}
-                        >
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight: 'bold',
-                              textDecoration: isCancelled ? 'line-through' : 'none',
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            {booking.room_name}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              display: 'block',
-                              fontSize: '0.75rem',
-                              lineHeight: 1.2,
-                              opacity: 0.95,
-                            }}
-                          >
-                            {booking.specialty || 'No specialty'}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              display: 'block',
-                              fontSize: '0.75rem',
-                              lineHeight: 1.2,
-                              opacity: 0.95,
-                            }}
-                          >
-                            {getSessionLabel(booking.session)}
-                          </Typography>
-                          {booking.doctor_name && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                display: 'block',
-                                fontSize: '0.7rem',
-                                lineHeight: 1.2,
-                                opacity: 0.9,
-                              }}
-                            >
-                              Dr: {booking.doctor_name}
-                            </Typography>
-                          )}
-                          {booking.clinic_code && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                display: 'block',
-                                fontSize: '0.7rem',
-                                lineHeight: 1.2,
-                                opacity: 0.9,
-                              }}
-                            >
-                              Code: {booking.clinic_code}
-                            </Typography>
-                          )}
-                          {isCancelled && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                display: 'block',
-                                fontSize: '0.75rem',
-                                fontWeight: 'bold',
-                                color: '#ffcdd2',
-                                mt: 0.5,
-                              }}
-                            >
-                              CANCELLED
-                            </Typography>
-                          )}
-                        </Paper>
-                      );
-                    })
+                    dayBookings.map(booking => renderBookingBlock(booking))
                   )}
                 </Box>
               </Grid>
             );
           })}
         </Grid>
-      </Box>
-    );
-  };
-
-  // Render day view
-  const renderDayView = () => {
-    const dayBookings = getBookingsForDate(currentDate);
-
-    // Group bookings by session
-    const amBookings = dayBookings.filter(b => b.session === 'am');
-    const pmBookings = dayBookings.filter(b => b.session === 'pm');
-    const allDayBookings = dayBookings.filter(b => b.session === 'all_day');
-
-    const renderSessionBookings = (sessionBookings, title) => (
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ borderBottom: '2px solid #1976d2', pb: 1 }}>
-          {title} ({sessionBookings.length})
-        </Typography>
-        {sessionBookings.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No bookings</Typography>
-        ) : (
-          <Grid container spacing={2}>
-            {sessionBookings.map(booking => {
-              const isCancelled = booking.status === 'cancelled';
-              const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
-
-              return (
-                <Grid item xs={12} md={6} lg={4} key={booking.id}>
-                  <Paper
-                    elevation={3}
-                    sx={{
-                      p: 2,
-                      backgroundColor: bgColor,
-                      color: 'white',
-                      opacity: isCancelled ? 0.8 : 1,
-                      borderRadius: 2,
-                    }}
-                  >
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        textDecoration: isCancelled ? 'line-through' : 'none',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      {booking.room_name}
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        opacity: 0.95,
-                        mt: 0.5,
-                      }}
-                    >
-                      {booking.specialty || 'No specialty'}
-                    </Typography>
-                    {booking.clinic_name && (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          opacity: 0.9,
-                        }}
-                      >
-                        {booking.clinic_name}
-                      </Typography>
-                    )}
-                    {booking.doctor_name && (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          mt: 1,
-                          opacity: 0.95,
-                        }}
-                      >
-                        <strong>Doctor:</strong> {booking.doctor_name}
-                      </Typography>
-                    )}
-                    {booking.clinic_code && (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          opacity: 0.95,
-                        }}
-                      >
-                        <strong>Code:</strong> {booking.clinic_code}
-                      </Typography>
-                    )}
-                    {booking.notes && (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          mt: 1,
-                          opacity: 0.85,
-                          fontStyle: 'italic',
-                        }}
-                      >
-                        {booking.notes}
-                      </Typography>
-                    )}
-                    {isCancelled && (
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          mt: 1,
-                          fontWeight: 'bold',
-                          color: '#ffcdd2',
-                        }}
-                      >
-                        CANCELLED
-                      </Typography>
-                    )}
-                  </Paper>
-                </Grid>
-              );
-            })}
-          </Grid>
-        )}
-      </Box>
-    );
-
-    return (
-      <Box sx={{ p: 2 }}>
-        {renderSessionBookings(allDayBookings, 'All Day (08:30 - 17:30)')}
-        {renderSessionBookings(amBookings, 'Morning (08:30 - 12:30)')}
-        {renderSessionBookings(pmBookings, 'Afternoon (13:30 - 17:30)')}
       </Box>
     );
   };
@@ -824,14 +618,13 @@ function CalendarView() {
 
       {/* Calendar */}
       <Card>
-        <CardContent sx={{ p: viewMode === 'month' ? 0 : 2 }}>
+        <CardContent sx={{ p: 2, overflow: 'auto' }}>
           {loading ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <Typography>Loading...</Typography>
             </Box>
           ) : (
             <>
-              {viewMode === 'month' && renderMonthView()}
               {viewMode === 'week' && renderWeekView()}
               {viewMode === 'day' && renderDayView()}
             </>
