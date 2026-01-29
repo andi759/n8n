@@ -8,15 +8,11 @@ import {
   TextField,
   MenuItem,
   Button,
-  IconButton,
   FormControlLabel,
   Checkbox,
-  Grid,
   Paper,
 } from '@mui/material';
 import {
-  ChevronLeft,
-  ChevronRight,
   Today,
 } from '@mui/icons-material';
 import { getAllBookings } from '../services/bookingService';
@@ -26,17 +22,8 @@ import { getAllSpecialties } from '../services/specialtyService';
 import {
   format,
   addDays,
-  addWeeks,
   subDays,
-  subWeeks,
-  isToday,
-  getDay,
 } from 'date-fns';
-
-const VIEW_OPTIONS = [
-  { value: 'week', label: 'Weekly' },
-  { value: 'day', label: 'Daily' },
-];
 
 // Time slots from 08:00 to 17:30 in 30-min increments
 const TIME_SLOTS = [];
@@ -64,15 +51,8 @@ const getSessionLabel = (session) => {
   }
 };
 
-// Get the Sunday before the given date
-const getSunday = (date) => {
-  const day = getDay(date);
-  return subDays(date, day);
-};
-
 function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState('day');
   const [bookings, setBookings] = useState([]);
   const [clinics, setClinics] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -95,7 +75,7 @@ function CalendarView() {
 
   useEffect(() => {
     loadBookings();
-  }, [currentDate, viewMode, filters]);
+  }, [currentDate, filters]);
 
   useEffect(() => {
     if (filters.clinic_id) {
@@ -138,20 +118,8 @@ function CalendarView() {
   };
 
   const dateRange = useMemo(() => {
-    let start, end;
-    switch (viewMode) {
-      case 'day':
-        start = currentDate;
-        end = currentDate;
-        break;
-      case 'week':
-      default:
-        start = getSunday(currentDate);
-        end = addDays(start, 6);
-        break;
-    }
-    return { start, end };
-  }, [currentDate, viewMode]);
+    return { start: currentDate, end: currentDate };
+  }, [currentDate]);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -179,37 +147,17 @@ function CalendarView() {
   };
 
   const handlePrevious = () => {
-    if (viewMode === 'day') setCurrentDate(prev => subDays(prev, 1));
-    else setCurrentDate(prev => subWeeks(prev, 1));
+    setCurrentDate(prev => subDays(prev, 1));
   };
 
   const handleNext = () => {
-    if (viewMode === 'day') setCurrentDate(prev => addDays(prev, 1));
-    else setCurrentDate(prev => addWeeks(prev, 1));
+    setCurrentDate(prev => addDays(prev, 1));
   };
 
   const handleToday = () => setCurrentDate(new Date());
 
-  const getBookingsForDate = (date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return bookings.filter(b => b.booking_date === dateStr);
-  };
-
   const getViewTitle = () => {
-    if (viewMode === 'day') return format(currentDate, 'EEEE dd MMMM yyyy');
-    const weekStart = getSunday(currentDate);
-    const weekEnd = addDays(weekStart, 6);
-    return `${format(weekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`;
-  };
-
-  const getWeekDays = () => {
-    const days = [];
-    let day = getSunday(currentDate);
-    for (let i = 0; i < 7; i++) {
-      days.push(day);
-      day = addDays(day, 1);
-    }
-    return days;
+    return format(currentDate, 'EEEE dd MMMM yyyy');
   };
 
   // Get rooms to display for the day view
@@ -408,112 +356,6 @@ function CalendarView() {
     );
   };
 
-  // Render a booking block for week view
-  const renderBookingBlock = (booking) => {
-    const isCancelled = booking.status === 'cancelled';
-    const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
-
-    return (
-      <Paper
-        key={booking.id}
-        elevation={2}
-        sx={{
-          p: 1,
-          mb: 0.5,
-          backgroundColor: bgColor,
-          color: 'white',
-          opacity: isCancelled ? 0.7 : 1,
-          borderRadius: 1,
-        }}
-      >
-        <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.7rem', lineHeight: 1.2 }}>
-          {booking.room_name}
-        </Typography>
-        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.2 }}>
-          {booking.specialty || 'No specialty'}
-        </Typography>
-        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
-          {getSessionLabel(booking.session)}
-        </Typography>
-        {booking.doctor_name && (
-          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
-            {booking.doctor_name}
-          </Typography>
-        )}
-        {isCancelled && (
-          <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: '#ffcdd2', fontSize: '0.6rem' }}>
-            CANCELLED
-          </Typography>
-        )}
-      </Paper>
-    );
-  };
-
-  // Render week view
-  const renderWeekView = () => {
-    const days = getWeekDays();
-
-    return (
-      <Box>
-        <Grid container>
-          {days.map(day => {
-            const dayBookings = getBookingsForDate(day);
-            const isCurrentDay = isToday(day);
-
-            return (
-              <Grid
-                item
-                xs
-                key={day.toISOString()}
-                sx={{
-                  border: '1px solid #e0e0e0',
-                  borderLeft: 'none',
-                  '&:first-of-type': { borderLeft: '1px solid #e0e0e0' },
-                }}
-              >
-                <Box
-                  sx={{
-                    p: 1,
-                    textAlign: 'center',
-                    borderBottom: '1px solid #e0e0e0',
-                    backgroundColor: isCurrentDay ? 'primary.main' : '#f5f5f5',
-                    color: isCurrentDay ? 'white' : 'inherit',
-                    cursor: 'pointer',
-                    '&:hover': { opacity: 0.85 },
-                  }}
-                  onClick={() => {
-                    setCurrentDate(day);
-                    setViewMode('day');
-                  }}
-                >
-                  <Typography variant="subtitle2" fontWeight="bold">
-                    {format(day, 'EEE')}
-                  </Typography>
-                  <Typography variant="h6">
-                    {format(day, 'd')}
-                  </Typography>
-                  <Typography variant="caption">
-                    {format(day, 'MMM')}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ p: 0.5, minHeight: '300px', maxHeight: '500px', overflow: 'auto' }}>
-                  {dayBookings.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
-                      No bookings
-                    </Typography>
-                  ) : (
-                    dayBookings.map(booking => renderBookingBlock(booking))
-                  )}
-                </Box>
-              </Grid>
-            );
-          })}
-        </Grid>
-      </Box>
-    );
-  };
-
   return (
     <Container maxWidth={false} sx={{ maxWidth: '100%' }}>
       <Box sx={{ mb: 3 }}>
@@ -526,21 +368,6 @@ function CalendarView() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-            <TextField
-              select
-              label="View"
-              size="small"
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
-              sx={{ minWidth: 120 }}
-            >
-              {VIEW_OPTIONS.map(option => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
-
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Button variant="text" size="small" onClick={handlePrevious} sx={{ minWidth: 'auto' }}>
                 &laquo; Prev
@@ -631,16 +458,13 @@ function CalendarView() {
 
       {/* Calendar */}
       <Card>
-        <CardContent sx={{ p: viewMode === 'day' ? 1 : 2, overflow: 'auto' }}>
+        <CardContent sx={{ p: 1, overflow: 'auto' }}>
           {loading ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <Typography>Loading...</Typography>
             </Box>
           ) : (
-            <>
-              {viewMode === 'week' && renderWeekView()}
-              {viewMode === 'day' && renderDayView()}
-            </>
+            renderDayView()
           )}
         </CardContent>
       </Card>
