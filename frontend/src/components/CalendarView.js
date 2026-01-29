@@ -13,12 +13,6 @@ import {
   Checkbox,
   Grid,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -31,8 +25,6 @@ import { getAllClinics } from '../services/clinicService';
 import { getAllSpecialties } from '../services/specialtyService';
 import {
   format,
-  startOfWeek,
-  endOfWeek,
   addDays,
   addWeeks,
   subDays,
@@ -46,6 +38,22 @@ const VIEW_OPTIONS = [
   { value: 'day', label: 'Daily' },
 ];
 
+// Time slots from 08:00 to 17:30 in 30-min increments
+const TIME_SLOTS = [];
+for (let h = 8; h <= 17; h++) {
+  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`);
+  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`);
+}
+
+const ROW_HEIGHT = 30; // px per 30-min slot
+
+// Convert time string "HH:MM" to slot index
+const timeToSlotIndex = (time) => {
+  if (!time) return 0;
+  const [h, m] = time.split(':').map(Number);
+  return (h - 8) * 2 + (m >= 30 ? 1 : 0);
+};
+
 // Helper function to format session display
 const getSessionLabel = (session) => {
   switch (session) {
@@ -56,7 +64,7 @@ const getSessionLabel = (session) => {
   }
 };
 
-// Get the Sunday before the given date (start of week)
+// Get the Sunday before the given date
 const getSunday = (date) => {
   const day = getDay(date);
   return subDays(date, day);
@@ -72,7 +80,6 @@ function CalendarView() {
   const [specialties, setSpecialties] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Filters
   const [filters, setFilters] = useState({
     clinic_id: '',
     room_id: '',
@@ -130,10 +137,8 @@ function CalendarView() {
     }
   };
 
-  // Calculate date range based on view mode
   const dateRange = useMemo(() => {
     let start, end;
-
     switch (viewMode) {
       case 'day':
         start = currentDate;
@@ -145,7 +150,6 @@ function CalendarView() {
         end = addDays(start, 6);
         break;
     }
-
     return { start, end };
   }, [currentDate, viewMode]);
 
@@ -156,7 +160,6 @@ function CalendarView() {
         start_date: format(dateRange.start, 'yyyy-MM-dd'),
         end_date: format(dateRange.end, 'yyyy-MM-dd'),
       };
-
       if (filters.clinic_id) params.clinic_id = filters.clinic_id;
       if (filters.room_id) params.room_id = filters.room_id;
       if (filters.specialty) params.specialty = filters.specialty;
@@ -176,148 +179,64 @@ function CalendarView() {
   };
 
   const handlePrevious = () => {
-    switch (viewMode) {
-      case 'day':
-        setCurrentDate(prev => subDays(prev, 1));
-        break;
-      case 'week':
-      default:
-        setCurrentDate(prev => subWeeks(prev, 1));
-        break;
-    }
+    if (viewMode === 'day') setCurrentDate(prev => subDays(prev, 1));
+    else setCurrentDate(prev => subWeeks(prev, 1));
   };
 
   const handleNext = () => {
-    switch (viewMode) {
-      case 'day':
-        setCurrentDate(prev => addDays(prev, 1));
-        break;
-      case 'week':
-      default:
-        setCurrentDate(prev => addWeeks(prev, 1));
-        break;
-    }
+    if (viewMode === 'day') setCurrentDate(prev => addDays(prev, 1));
+    else setCurrentDate(prev => addWeeks(prev, 1));
   };
 
-  const handleToday = () => {
-    setCurrentDate(new Date());
-  };
+  const handleToday = () => setCurrentDate(new Date());
 
-  // Get bookings for a specific date
   const getBookingsForDate = (date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return bookings.filter(b => b.booking_date === dateStr);
   };
 
-  // Get title based on view mode
   const getViewTitle = () => {
-    switch (viewMode) {
-      case 'day':
-        return format(currentDate, 'EEEE, dd MMMM yyyy');
-      case 'week':
-      default:
-        const weekStart = getSunday(currentDate);
-        const weekEnd = addDays(weekStart, 6);
-        return `${format(weekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`;
-    }
+    if (viewMode === 'day') return format(currentDate, 'EEEE dd MMMM yyyy');
+    const weekStart = getSunday(currentDate);
+    const weekEnd = addDays(weekStart, 6);
+    return `${format(weekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`;
   };
 
-  // Generate days for week view
   const getWeekDays = () => {
     const days = [];
     let day = getSunday(currentDate);
-
     for (let i = 0; i < 7; i++) {
       days.push(day);
       day = addDays(day, 1);
     }
-
     return days;
   };
 
-  // Get rooms that have bookings for a given date, plus any filtered rooms
-  const getRoomsForDate = (date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const dayBookings = bookings.filter(b => b.booking_date === dateStr);
-
-    // Get unique room IDs from bookings
-    const bookedRoomIds = new Set(dayBookings.map(b => b.room_id));
-
-    // Get rooms to display - either filtered rooms or rooms with bookings
-    let displayRooms;
+  // Get rooms to display for the day view
+  const getDisplayRooms = () => {
     if (filters.room_id) {
-      displayRooms = rooms.filter(r => r.id === parseInt(filters.room_id));
-    } else if (filters.clinic_id) {
-      displayRooms = rooms.filter(r => bookedRoomIds.has(r.id));
-    } else {
-      displayRooms = allRooms.filter(r => bookedRoomIds.has(r.id));
+      return rooms.filter(r => r.id === parseInt(filters.room_id));
     }
-
-    return displayRooms.sort((a, b) => {
-      if (a.clinic_name !== b.clinic_name) return a.clinic_name.localeCompare(b.clinic_name);
-      return a.room_number.localeCompare(b.room_number);
-    });
+    if (filters.clinic_id) {
+      return rooms.sort((a, b) => a.room_number.localeCompare(b.room_number));
+    }
+    // No filter: show rooms that have bookings
+    const dateStr = format(currentDate, 'yyyy-MM-dd');
+    const dayBookings = bookings.filter(b => b.booking_date === dateStr);
+    const bookedRoomIds = new Set(dayBookings.map(b => b.room_id));
+    return allRooms
+      .filter(r => bookedRoomIds.has(r.id))
+      .sort((a, b) => {
+        if (a.clinic_name !== b.clinic_name) return a.clinic_name.localeCompare(b.clinic_name);
+        return a.room_number.localeCompare(b.room_number);
+      });
   };
 
-  // Render a booking block with all details
-  const renderBookingBlock = (booking) => {
-    const isCancelled = booking.status === 'cancelled';
-    const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
-
-    return (
-      <Paper
-        key={booking.id}
-        elevation={2}
-        sx={{
-          p: 1.5,
-          mb: 1,
-          backgroundColor: bgColor,
-          color: 'white',
-          opacity: isCancelled ? 0.7 : 1,
-          borderRadius: 1,
-          minHeight: 80,
-        }}
-      >
-        <Typography variant="body2" sx={{ fontWeight: 'bold', lineHeight: 1.3, textDecoration: isCancelled ? 'line-through' : 'none' }}>
-          {booking.specialty || 'No specialty'}
-        </Typography>
-        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.75rem', lineHeight: 1.3, opacity: 0.95 }}>
-          {getSessionLabel(booking.session)} ({booking.start_time} - {booking.end_time})
-        </Typography>
-        {booking.doctor_name && (
-          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.3, opacity: 0.9 }}>
-            Dr: {booking.doctor_name}
-          </Typography>
-        )}
-        {booking.clinic_code && (
-          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.3, opacity: 0.9 }}>
-            Code: {booking.clinic_code}
-          </Typography>
-        )}
-        {booking.clinic_name && (
-          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem', lineHeight: 1.3, opacity: 0.9 }}>
-            Clinic: {booking.clinic_name}
-          </Typography>
-        )}
-        {booking.notes && (
-          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.3, opacity: 0.8, fontStyle: 'italic', mt: 0.5 }}>
-            {booking.notes}
-          </Typography>
-        )}
-        {isCancelled && (
-          <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: '#ffcdd2', mt: 0.5 }}>
-            CANCELLED
-          </Typography>
-        )}
-      </Paper>
-    );
-  };
-
-  // Render day view - rooms as columns, sessions as rows
+  // Render the day view with time slots and room columns
   const renderDayView = () => {
     const dateStr = format(currentDate, 'yyyy-MM-dd');
     const dayBookings = bookings.filter(b => b.booking_date === dateStr);
-    const displayRooms = getRoomsForDate(currentDate);
+    const displayRooms = getDisplayRooms();
 
     if (displayRooms.length === 0 && dayBookings.length === 0) {
       return (
@@ -327,99 +246,206 @@ function CalendarView() {
       );
     }
 
-    const sessions = [
-      { key: 'all_day', label: 'All Day', time: '08:30 - 17:30' },
-      { key: 'am', label: 'AM', time: '08:30 - 12:30' },
-      { key: 'pm', label: 'PM', time: '13:30 - 17:30' },
-    ];
+    const totalHeight = TIME_SLOTS.length * ROW_HEIGHT;
+    const timeColWidth = 60;
+    const roomColWidth = 160;
 
     return (
-      <TableContainer component={Paper} elevation={0}>
-        <Table sx={{ tableLayout: 'fixed' }}>
-          <TableHead>
-            <TableRow>
-              <TableCell
+      <Box sx={{ overflowX: 'auto' }}>
+        <Box sx={{ display: 'flex', minWidth: timeColWidth + displayRooms.length * roomColWidth }}>
+          {/* Time column header */}
+          <Box sx={{ width: timeColWidth, minWidth: timeColWidth, flexShrink: 0 }} />
+
+          {/* Room headers */}
+          {displayRooms.map(room => (
+            <Box
+              key={room.id}
+              sx={{
+                width: roomColWidth,
+                minWidth: roomColWidth,
+                flexShrink: 0,
+                textAlign: 'center',
+                p: 1,
+                borderBottom: '2px solid #9c27b0',
+                borderLeft: '1px solid #e0e0e0',
+                backgroundColor: '#f3e5f5',
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '0.8rem', color: '#6a1b9a' }}>
+                {room.room_name}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Time grid */}
+        <Box sx={{ display: 'flex', minWidth: timeColWidth + displayRooms.length * roomColWidth }}>
+          {/* Time labels */}
+          <Box sx={{ width: timeColWidth, minWidth: timeColWidth, flexShrink: 0, position: 'relative', height: totalHeight }}>
+            {TIME_SLOTS.map((time, idx) => (
+              <Box
+                key={time}
                 sx={{
-                  width: 120,
-                  fontWeight: 'bold',
-                  backgroundColor: '#f5f5f5',
-                  borderRight: '2px solid #e0e0e0',
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 1,
+                  position: 'absolute',
+                  top: idx * ROW_HEIGHT,
+                  height: ROW_HEIGHT,
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  pr: 1,
+                  borderBottom: '1px solid #f0f0f0',
+                  fontSize: '0.75rem',
+                  color: '#666',
+                  fontWeight: time.endsWith(':00') ? 'bold' : 'normal',
                 }}
               >
-                Session
-              </TableCell>
-              {displayRooms.map(room => (
-                <TableCell
-                  key={room.id}
-                  align="center"
-                  sx={{
-                    fontWeight: 'bold',
-                    backgroundColor: '#f5f5f5',
-                    borderRight: '1px solid #e0e0e0',
-                    minWidth: 180,
-                    p: 1,
-                  }}
-                >
-                  <Typography variant="subtitle2" fontWeight="bold">
-                    {room.room_name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    {room.room_number}
-                  </Typography>
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sessions.map(session => (
-              <TableRow key={session.key}>
-                <TableCell
-                  sx={{
-                    fontWeight: 'bold',
-                    backgroundColor: '#fafafa',
-                    borderRight: '2px solid #e0e0e0',
-                    verticalAlign: 'top',
-                    position: 'sticky',
-                    left: 0,
-                    zIndex: 1,
-                    p: 1.5,
-                  }}
-                >
-                  <Typography variant="subtitle2" fontWeight="bold">
-                    {session.label}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {session.time}
-                  </Typography>
-                </TableCell>
-                {displayRooms.map(room => {
-                  const cellBookings = dayBookings.filter(
-                    b => b.room_id === room.id && b.session === session.key
-                  );
+                {time}
+              </Box>
+            ))}
+          </Box>
+
+          {/* Room columns */}
+          {displayRooms.map(room => {
+            const roomBookings = dayBookings.filter(b => b.room_id === room.id);
+
+            return (
+              <Box
+                key={room.id}
+                sx={{
+                  width: roomColWidth,
+                  minWidth: roomColWidth,
+                  flexShrink: 0,
+                  position: 'relative',
+                  height: totalHeight,
+                  borderLeft: '1px solid #e0e0e0',
+                }}
+              >
+                {/* Grid lines */}
+                {TIME_SLOTS.map((time, idx) => (
+                  <Box
+                    key={time}
+                    sx={{
+                      position: 'absolute',
+                      top: idx * ROW_HEIGHT,
+                      height: ROW_HEIGHT,
+                      width: '100%',
+                      borderBottom: time.endsWith(':00') ? '1px solid #e0e0e0' : '1px solid #f5f5f5',
+                    }}
+                  />
+                ))}
+
+                {/* Booking blocks */}
+                {roomBookings.map(booking => {
+                  const startIdx = timeToSlotIndex(booking.start_time);
+                  const endIdx = timeToSlotIndex(booking.end_time);
+                  const spanSlots = Math.max(endIdx - startIdx, 1);
+                  const top = startIdx * ROW_HEIGHT;
+                  const height = spanSlots * ROW_HEIGHT;
+                  const isCancelled = booking.status === 'cancelled';
+                  const bgColor = isCancelled ? '#bdbdbd' : (booking.color || '#1976d2');
 
                   return (
-                    <TableCell
-                      key={room.id}
+                    <Paper
+                      key={booking.id}
+                      elevation={1}
                       sx={{
-                        borderRight: '1px solid #e0e0e0',
-                        verticalAlign: 'top',
-                        p: 1,
-                        minHeight: 120,
-                        backgroundColor: cellBookings.length > 0 ? 'transparent' : '#fafafa',
+                        position: 'absolute',
+                        top: top + 1,
+                        left: 2,
+                        right: 2,
+                        height: height - 2,
+                        backgroundColor: bgColor,
+                        color: 'white',
+                        opacity: isCancelled ? 0.7 : 1,
+                        borderRadius: 1,
+                        p: 0.75,
+                        overflow: 'hidden',
+                        zIndex: 2,
+                        display: 'flex',
+                        flexDirection: 'column',
                       }}
                     >
-                      {cellBookings.map(booking => renderBookingBlock(booking))}
-                    </TableCell>
+                      <Typography sx={{ fontWeight: 'bold', fontSize: '0.75rem', lineHeight: 1.2 }}>
+                        {booking.specialty || 'No specialty'}
+                      </Typography>
+                      {booking.doctor_name && (
+                        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+                          Name: {booking.doctor_name}
+                        </Typography>
+                      )}
+                      {booking.clinic_code && (
+                        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+                          Clinic Code: {booking.clinic_code}
+                        </Typography>
+                      )}
+                      <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+                        Session: {getSessionLabel(booking.session)}
+                      </Typography>
+                      {booking.clinic_name && (
+                        <Typography sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+                          Clinic: {booking.clinic_name}
+                        </Typography>
+                      )}
+                      {booking.notes && (
+                        <Typography sx={{ fontSize: '0.6rem', lineHeight: 1.3, fontStyle: 'italic', opacity: 0.9 }}>
+                          {booking.notes}
+                        </Typography>
+                      )}
+                      {isCancelled && (
+                        <Typography sx={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#ffcdd2' }}>
+                          CANCELLED
+                        </Typography>
+                      )}
+                    </Paper>
                   );
                 })}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              </Box>
+            );
+          })}
+        </Box>
+      </Box>
+    );
+  };
+
+  // Render a booking block for week view
+  const renderBookingBlock = (booking) => {
+    const isCancelled = booking.status === 'cancelled';
+    const bgColor = isCancelled ? '#9e9e9e' : (booking.color || '#1976d2');
+
+    return (
+      <Paper
+        key={booking.id}
+        elevation={2}
+        sx={{
+          p: 1,
+          mb: 0.5,
+          backgroundColor: bgColor,
+          color: 'white',
+          opacity: isCancelled ? 0.7 : 1,
+          borderRadius: 1,
+        }}
+      >
+        <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.7rem', lineHeight: 1.2 }}>
+          {booking.room_name}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.2 }}>
+          {booking.specialty || 'No specialty'}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
+          {getSessionLabel(booking.session)}
+        </Typography>
+        {booking.doctor_name && (
+          <Typography variant="caption" sx={{ display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
+            {booking.doctor_name}
+          </Typography>
+        )}
+        {isCancelled && (
+          <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold', color: '#ffcdd2', fontSize: '0.6rem' }}>
+            CANCELLED
+          </Typography>
+        )}
+      </Paper>
     );
   };
 
@@ -445,7 +471,6 @@ function CalendarView() {
                   '&:first-of-type': { borderLeft: '1px solid #e0e0e0' },
                 }}
               >
-                {/* Day header */}
                 <Box
                   sx={{
                     p: 1,
@@ -472,8 +497,7 @@ function CalendarView() {
                   </Typography>
                 </Box>
 
-                {/* Bookings */}
-                <Box sx={{ p: 1, minHeight: '300px', maxHeight: '500px', overflow: 'auto' }}>
+                <Box sx={{ p: 0.5, minHeight: '300px', maxHeight: '500px', overflow: 'auto' }}>
                   {dayBookings.length === 0 ? (
                     <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
                       No bookings
@@ -491,7 +515,7 @@ function CalendarView() {
   };
 
   return (
-    <Container maxWidth="xl">
+    <Container maxWidth={false} sx={{ maxWidth: '100%' }}>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
           Calendar View
@@ -501,8 +525,7 @@ function CalendarView() {
       {/* Filters and Controls */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
-            {/* View Mode */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
             <TextField
               select
               label="View"
@@ -518,11 +541,10 @@ function CalendarView() {
               ))}
             </TextField>
 
-            {/* Navigation */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton onClick={handlePrevious} size="small">
-                <ChevronLeft />
-              </IconButton>
+              <Button variant="text" size="small" onClick={handlePrevious} sx={{ minWidth: 'auto' }}>
+                &laquo; Prev
+              </Button>
               <Button
                 variant="outlined"
                 size="small"
@@ -531,19 +553,17 @@ function CalendarView() {
               >
                 Today
               </Button>
-              <IconButton onClick={handleNext} size="small">
-                <ChevronRight />
-              </IconButton>
+              <Button variant="text" size="small" onClick={handleNext} sx={{ minWidth: 'auto' }}>
+                Next &raquo;
+              </Button>
             </Box>
 
-            {/* Current Period Title */}
-            <Typography variant="h6" sx={{ minWidth: 200, fontWeight: 'bold' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
               {getViewTitle()}
             </Typography>
 
             <Box sx={{ flexGrow: 1 }} />
 
-            {/* Filters */}
             <TextField
               select
               label="Clinic"
@@ -588,14 +608,7 @@ function CalendarView() {
               {specialties.map(specialty => (
                 <MenuItem key={specialty.id} value={specialty.name}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box
-                      sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '2px',
-                        backgroundColor: specialty.color,
-                      }}
-                    />
+                    <Box sx={{ width: 12, height: 12, borderRadius: '2px', backgroundColor: specialty.color }} />
                     {specialty.name}
                   </Box>
                 </MenuItem>
@@ -618,7 +631,7 @@ function CalendarView() {
 
       {/* Calendar */}
       <Card>
-        <CardContent sx={{ p: 2, overflow: 'auto' }}>
+        <CardContent sx={{ p: viewMode === 'day' ? 1 : 2, overflow: 'auto' }}>
           {loading ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <Typography>Loading...</Typography>
