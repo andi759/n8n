@@ -298,7 +298,7 @@ function RecurrencePattern({ recurrenceType, pattern, onChange }) {
                 <strong>Current Rota Week:</strong> {rotaWeek.description}
                 <br />
                 <Typography variant="caption">
-                  Cycle started: {new Date(rotaWeek.cycle_start_date).toLocaleDateString()}
+                  Weeks are based on day of month: 1st-7th = Week 1, 8th-14th = Week 2, 15th-21st = Week 3, 22nd-28th = Week 4, 29th+ = Week 5. Resets each month.
                 </Typography>
               </Alert>
             )}
@@ -329,8 +329,8 @@ function RecurrencePattern({ recurrenceType, pattern, onChange }) {
                   ))}
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  Select which weeks in the 5-week cycle
-                  {rotaWeek && ` (current week ${rotaWeek.week_number} is highlighted)`}
+                  Select which weeks of the month (Week 5 only applies to months with 29+ days)
+                  {rotaWeek && ` — current week ${rotaWeek.week_number} is highlighted`}
                 </Typography>
               </Grid>
 
@@ -360,7 +360,7 @@ function RecurrencePattern({ recurrenceType, pattern, onChange }) {
                   <Alert severity="success">
                     <strong>Example:</strong> This will book on{' '}
                     {currentPattern.five_week_rotor.days_of_week.map(d => fullDayNames[d]).join(', ')}{' '}
-                    during weeks {currentPattern.five_week_rotor.weeks.join(', ')} of every 5-week cycle
+                    during weeks {currentPattern.five_week_rotor.weeks.join(', ')} of every month
                   </Alert>
                 </Grid>
               )}

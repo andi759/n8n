@@ -1,95 +1,46 @@
 /**
- * Five-Week Rotor Calculator
- * Calculates which week (1-5) a given date falls within the rotor cycle
+ * Five-Week Rota Calculator
+ * Calculates which week (1-5) a given date falls within based on day of month.
+ * Week 1: Days 1-7, Week 2: Days 8-14, Week 3: Days 15-21, Week 4: Days 22-28, Week 5: Days 29-31
+ * The rota resets on the 1st of each month.
  */
 
 /**
- * Calculate the rotor week number for a given date
+ * Calculate the rota week number for a given date
  * @param {string|Date} date - The date to check
- * @param {string|Date} cycleStartDate - The start date of the rotor cycle
  * @returns {number} - Week number (1-5)
  */
-function calculateRotorWeek(date, cycleStartDate) {
+function calculateRotorWeek(date) {
     const targetDate = new Date(date);
-    const startDate = new Date(cycleStartDate);
+    const dayOfMonth = targetDate.getDate();
 
-    // Reset time components to compare dates only
-    targetDate.setHours(0, 0, 0, 0);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Calculate the difference in days
-    const diffTime = targetDate - startDate;
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    // Calculate which week we're in (0-based)
-    const weeksSinceStart = Math.floor(diffDays / 7);
-
-    // Get week within the 5-week cycle (1-5)
-    const rotorWeek = (weeksSinceStart % 5) + 1;
-
-    return rotorWeek;
+    if (dayOfMonth <= 7) return 1;
+    if (dayOfMonth <= 14) return 2;
+    if (dayOfMonth <= 21) return 3;
+    if (dayOfMonth <= 28) return 4;
+    return 5;
 }
 
 /**
- * Get the start date of a specific rotor week
- * @param {number} targetWeek - The target week number (1-5)
- * @param {string|Date} referenceDate - A reference date to find the nearest occurrence
- * @param {string|Date} cycleStartDate - The start date of the rotor cycle
- * @returns {Date} - The start date (Monday) of the target rotor week
- */
-function getRotorWeekStartDate(targetWeek, referenceDate, cycleStartDate) {
-    const refDate = new Date(referenceDate);
-    const startDate = new Date(cycleStartDate);
-
-    refDate.setHours(0, 0, 0, 0);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Calculate current rotor week
-    const currentWeek = calculateRotorWeek(refDate, cycleStartDate);
-
-    // Calculate how many weeks to add/subtract
-    let weeksToAdjust = targetWeek - currentWeek;
-
-    // If target week is in the past within current cycle, move to next cycle
-    if (weeksToAdjust < 0) {
-        weeksToAdjust += 5;
-    }
-
-    // Calculate the target date
-    const daysToAdjust = weeksToAdjust * 7;
-    const targetDate = new Date(refDate);
-    targetDate.setDate(targetDate.getDate() + daysToAdjust);
-
-    // Adjust to Monday of that week
-    const dayOfWeek = targetDate.getDay();
-    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    targetDate.setDate(targetDate.getDate() + daysToMonday);
-
-    return targetDate;
-}
-
-/**
- * Check if a given date falls within specific rotor weeks
+ * Check if a given date falls within specific rota weeks
  * @param {string|Date} date - The date to check
  * @param {number[]} targetWeeks - Array of target week numbers (e.g., [1, 3, 5])
- * @param {string|Date} cycleStartDate - The start date of the rotor cycle
  * @returns {boolean} - True if date falls within one of the target weeks
  */
-function isDateInRotorWeeks(date, targetWeeks, cycleStartDate) {
-    const rotorWeek = calculateRotorWeek(date, cycleStartDate);
+function isDateInRotorWeeks(date, targetWeeks) {
+    const rotorWeek = calculateRotorWeek(date);
     return targetWeeks.includes(rotorWeek);
 }
 
 /**
- * Get all dates for a specific day of week within target rotor weeks in a date range
+ * Get all dates for a specific day of week within target rota weeks in a date range
  * @param {number} dayOfWeek - Day of week (0=Sunday, 1=Monday, etc.)
- * @param {number[]} targetWeeks - Array of target rotor weeks (e.g., [1, 3, 5])
+ * @param {number[]} targetWeeks - Array of target rota weeks (e.g., [1, 3, 5])
  * @param {string|Date} startDate - Start of date range
  * @param {string|Date} endDate - End of date range
- * @param {string|Date} cycleStartDate - The start date of the rotor cycle
  * @returns {Date[]} - Array of dates matching the criteria
  */
-function getRotorDates(dayOfWeek, targetWeeks, startDate, endDate, cycleStartDate) {
+function getRotorDates(dayOfWeek, targetWeeks, startDate, endDate) {
     const dates = [];
     const current = new Date(startDate);
     const end = new Date(endDate);
@@ -104,8 +55,8 @@ function getRotorDates(dayOfWeek, targetWeeks, startDate, endDate, cycleStartDat
 
     // Iterate through all occurrences of the day of week in the range
     while (current <= end) {
-        // Check if this date is in one of the target rotor weeks
-        if (isDateInRotorWeeks(current, targetWeeks, cycleStartDate)) {
+        // Check if this date is in one of the target rota weeks
+        if (isDateInRotorWeeks(current, targetWeeks)) {
             dates.push(new Date(current));
         }
 
@@ -117,7 +68,7 @@ function getRotorDates(dayOfWeek, targetWeeks, startDate, endDate, cycleStartDat
 }
 
 /**
- * Get human-readable description of rotor week
+ * Get human-readable description of rota week
  * @param {number} week - Week number (1-5)
  * @returns {string} - Description like "Week 1 of 5"
  */
@@ -127,7 +78,6 @@ function getRotorWeekDescription(week) {
 
 module.exports = {
     calculateRotorWeek,
-    getRotorWeekStartDate,
     isDateInRotorWeeks,
     getRotorDates,
     getRotorWeekDescription

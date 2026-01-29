@@ -2,14 +2,6 @@ const db = require('../config/database');
 const { generateBookingInstances, previewBookingInstances, checkConflicts } = require('../services/recurrenceEngine');
 
 /**
- * Get rotor cycle start date
- */
-async function getRotorCycleStart() {
-    const rotor = await db.get('SELECT start_date FROM rotor_cycles WHERE id = 1');
-    return rotor ? rotor.start_date : process.env.ROTOR_CYCLE_START;
-}
-
-/**
  * Get all booking series
  */
 async function getAllSeries(req, res) {
@@ -83,13 +75,12 @@ async function getSeries(req, res) {
 async function previewSeries(req, res) {
     try {
         const seriesData = req.body;
-        const rotorCycleStart = await getRotorCycleStart();
 
         // Calculate preview range (default to series range or next 3 months)
         const rangeStart = seriesData.series_start_date;
         const rangeEnd = seriesData.series_end_date || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        const instances = previewBookingInstances(seriesData, rangeStart, rangeEnd, rotorCycleStart);
+        const instances = previewBookingInstances(seriesData, rangeStart, rangeEnd);
 
         // Check for conflicts
         const conflicts = await checkConflicts(instances, db);
@@ -179,9 +170,8 @@ async function createSeries(req, res) {
         }
 
         // Generate instances
-        const rotorCycleStart = await getRotorCycleStart();
         const rangeEnd = series_end_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        let instances = generateBookingInstances(series, series_start_date, rangeEnd, rotorCycleStart);
+        let instances = generateBookingInstances(series, series_start_date, rangeEnd);
 
         // Filter out excluded dates (conflicts or user-excluded)
         // Normalize dates to YYYY-MM-DD format for consistent comparison
@@ -269,9 +259,8 @@ async function updateSeries(req, res) {
             const series = await db.get('SELECT * FROM booking_series WHERE id = ?', [id]);
 
             // Regenerate instances
-            const rotorCycleStart = await getRotorCycleStart();
             const rangeEnd = series.series_end_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const instances = generateBookingInstances(series, series.series_start_date, rangeEnd, rotorCycleStart);
+            const instances = generateBookingInstances(series, series.series_start_date, rangeEnd);
 
             // Insert new instances
             const insertPromises = instances.map(instance =>
@@ -382,8 +371,7 @@ async function previewExtendSeries(req, res) {
         }
 
         // Generate new instances for the extension period
-        const rotorCycleStart = await getRotorCycleStart();
-        let newInstances = generateBookingInstances(series, extensionStartDate, new_end_date, rotorCycleStart);
+        let newInstances = generateBookingInstances(series, extensionStartDate, new_end_date);
 
         // Check for conflicts with existing bookings
         const conflicts = await checkConflicts(newInstances, db);
@@ -468,8 +456,7 @@ async function extendSeries(req, res) {
         `, [new_end_date, id]);
 
         // Generate new instances for the extension period
-        const rotorCycleStart = await getRotorCycleStart();
-        let newInstances = generateBookingInstances(series, extensionStartDate, new_end_date, rotorCycleStart);
+        let newInstances = generateBookingInstances(series, extensionStartDate, new_end_date);
 
         // Filter out excluded dates
         const excludedSet = new Set(excluded_dates.map(d => String(d).substring(0, 10)));

@@ -8,6 +8,5 @@ router.use(authenticateToken);
 
 router.get('/current-week', rotorController.getCurrentWeek);
 router.get('/week-for-date/:date', rotorController.getWeekForDate);
-router.post('/set-cycle-start', requireAdmin, rotorController.setCycleStart);
 
 module.exports = router;

@@ -6,10 +6,9 @@ const { getRotorDates } = require('./rotorCalculator');
  * @param {Object} series - Booking series object
  * @param {string|Date} rangeStart - Start of date range to generate instances
  * @param {string|Date} rangeEnd - End of date range to generate instances
- * @param {string|Date} rotorCycleStart - Start date of rotor cycle (for five_week_rotor pattern)
  * @returns {Array} - Array of booking instance objects
  */
-function generateBookingInstances(series, rangeStart, rangeEnd, rotorCycleStart) {
+function generateBookingInstances(series, rangeStart, rangeEnd) {
     const pattern = JSON.parse(series.recurrence_pattern || '{}');
     const seriesStart = new Date(series.series_start_date);
     const seriesEnd = series.series_end_date ? new Date(series.series_end_date) : null;
@@ -30,7 +29,7 @@ function generateBookingInstances(series, rangeStart, rangeEnd, rotorCycleStart)
             dates = handleMonthlyPattern(pattern, effectiveStart, effectiveEnd);
             break;
         case 'five_week_rotor':
-            dates = handleFiveWeekRotorPattern(pattern, effectiveStart, effectiveEnd, rotorCycleStart);
+            dates = handleFiveWeekRotorPattern(pattern, effectiveStart, effectiveEnd);
             break;
         case 'one_time':
             // For one-time bookings, just return the single date
@@ -131,7 +130,7 @@ function handleMonthlyPattern(pattern, startDate, endDate) {
 /**
  * Handle five-week rotor pattern
  */
-function handleFiveWeekRotorPattern(pattern, startDate, endDate, rotorCycleStart) {
+function handleFiveWeekRotorPattern(pattern, startDate, endDate) {
     const { weeks = [], days_of_week = [], day_of_week } = pattern.five_week_rotor || {};
 
     if (!weeks || weeks.length === 0) {
@@ -153,7 +152,7 @@ function handleFiveWeekRotorPattern(pattern, startDate, endDate, rotorCycleStart
     const allDates = [];
 
     daysToProcess.forEach(dayOfWeek => {
-        const datesForDay = getRotorDates(dayOfWeek, weeks, startDate, endDate, rotorCycleStart);
+        const datesForDay = getRotorDates(dayOfWeek, weeks, startDate, endDate);
         allDates.push(...datesForDay);
     });
 
@@ -166,7 +165,7 @@ function handleFiveWeekRotorPattern(pattern, startDate, endDate, rotorCycleStart
 /**
  * Preview booking instances before creating them
  */
-function previewBookingInstances(seriesData, rangeStart, rangeEnd, rotorCycleStart) {
+function previewBookingInstances(seriesData, rangeStart, rangeEnd) {
     // Convert seriesData to the format expected by generateBookingInstances
     const series = {
         ...seriesData,
@@ -175,7 +174,7 @@ function previewBookingInstances(seriesData, rangeStart, rangeEnd, rotorCycleSta
             : JSON.stringify(seriesData.recurrence_pattern)
     };
 
-    return generateBookingInstances(series, rangeStart, rangeEnd, rotorCycleStart);
+    return generateBookingInstances(series, rangeStart, rangeEnd);
 }
 
 /**

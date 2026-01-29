@@ -1,16 +1,17 @@
-export function calculateRotorWeek(date, cycleStartDate) {
+/**
+ * Calculate the rota week number for a given date based on day of month.
+ * Week 1: Days 1-7, Week 2: Days 8-14, Week 3: Days 15-21, Week 4: Days 22-28, Week 5: Days 29-31
+ * Resets on the 1st of each month.
+ */
+export function calculateRotorWeek(date) {
   const targetDate = new Date(date);
-  const startDate = new Date(cycleStartDate);
+  const dayOfMonth = targetDate.getDate();
 
-  targetDate.setHours(0, 0, 0, 0);
-  startDate.setHours(0, 0, 0, 0);
-
-  const diffTime = targetDate - startDate;
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  const weeksSinceStart = Math.floor(diffDays / 7);
-  const rotorWeek = (weeksSinceStart % 5) + 1;
-
-  return rotorWeek;
+  if (dayOfMonth <= 7) return 1;
+  if (dayOfMonth <= 14) return 2;
+  if (dayOfMonth <= 21) return 3;
+  if (dayOfMonth <= 28) return 4;
+  return 5;
 }
 
 export function getRotorWeekDescription(week) {
