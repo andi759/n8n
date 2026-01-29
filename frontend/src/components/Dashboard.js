@@ -93,7 +93,7 @@ function Dashboard() {
               {rotaWeek.description}
             </Typography>
             <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-              Cycle started: {format(new Date(rotaWeek.cycle_start_date), 'MMM dd, yyyy')}
+              Weeks are based on day of month (1st-7th = Week 1, 8th-14th = Week 2, etc.)
             </Typography>
           </CardContent>
         </Card>
