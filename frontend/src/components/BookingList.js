@@ -86,6 +86,7 @@ function BookingList() {
     status: '',
     is_reallocated: '',
     session: '',
+    is_ad_hoc: '',
   });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -159,6 +160,7 @@ function BookingList() {
       if (filters.status) params.status = filters.status;
       if (filters.is_reallocated) params.is_reallocated = filters.is_reallocated;
       if (filters.session) params.session = filters.session;
+      if (filters.is_ad_hoc) params.is_ad_hoc = filters.is_ad_hoc;
 
       const data = await getAllBookings(params);
       setBookings(data);
@@ -419,6 +421,19 @@ function BookingList() {
               <MenuItem value="">All</MenuItem>
               <MenuItem value="true">Reallocated Only</MenuItem>
               <MenuItem value="false">Not Reallocated</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Ad Hoc"
+              size="small"
+              value={filters.is_ad_hoc}
+              onChange={(e) => handleFilterChange('is_ad_hoc', e.target.value)}
+              sx={{ minWidth: 120 }}
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="true">Ad Hoc Only</MenuItem>
+              <MenuItem value="false">Not Ad Hoc</MenuItem>
             </TextField>
 
             <Button

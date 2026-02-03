@@ -5,7 +5,7 @@ const db = require('../config/database');
  */
 async function getAllBookings(req, res) {
     try {
-        const { start_date, end_date, room_id, clinic_id, status, specialty, is_reallocated, session } = req.query;
+        const { start_date, end_date, room_id, clinic_id, status, specialty, is_reallocated, session, is_ad_hoc } = req.query;
 
         let query = `
             SELECT b.*, r.room_name, r.room_number, c.clinic_name, c.clinic_code as clinic_code_name,
@@ -58,6 +58,11 @@ async function getAllBookings(req, res) {
         if (session) {
             query += ' AND b.session = ?';
             params.push(session);
+        }
+
+        if (is_ad_hoc !== undefined && is_ad_hoc !== '') {
+            query += ' AND b.is_ad_hoc = ?';
+            params.push(is_ad_hoc === 'true' ? 1 : 0);
         }
 
         query += ' ORDER BY b.booking_date, b.start_time';
