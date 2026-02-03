@@ -197,13 +197,20 @@ function CalendarView() {
     return format(currentDate, 'EEEE dd MMMM yyyy');
   };
 
+  // Extract numeric part from room number for sorting (e.g., "Room 10" -> 10)
+  const extractRoomNumber = (roomNumber) => {
+    if (!roomNumber) return 0;
+    const match = roomNumber.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
   // Get rooms to display for the day view
   const getDisplayRooms = () => {
     if (filters.room_id) {
       return rooms.filter(r => r.id === parseInt(filters.room_id));
     }
     if (filters.clinic_id) {
-      return rooms.sort((a, b) => a.room_number.localeCompare(b.room_number));
+      return [...rooms].sort((a, b) => extractRoomNumber(a.room_number) - extractRoomNumber(b.room_number));
     }
     // No filter: show rooms that have bookings
     const dateStr = format(currentDate, 'yyyy-MM-dd');
@@ -213,7 +220,7 @@ function CalendarView() {
       .filter(r => bookedRoomIds.has(r.id))
       .sort((a, b) => {
         if (a.clinic_name !== b.clinic_name) return a.clinic_name.localeCompare(b.clinic_name);
-        return a.room_number.localeCompare(b.room_number);
+        return extractRoomNumber(a.room_number) - extractRoomNumber(b.room_number);
       });
   };
 
