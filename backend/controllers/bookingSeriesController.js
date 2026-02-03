@@ -184,6 +184,29 @@ async function createSeries(req, res) {
         console.log('Total instances:', instances.length);
         console.log('Filtered instances (to be created):', filteredInstances.length);
 
+        // CRITICAL: Check for conflicts before inserting - this is the server-side safety check
+        const conflicts = await checkConflicts(filteredInstances, db);
+        if (conflicts.length > 0) {
+            // Delete the series we just created since we can't create the bookings
+            await db.run('DELETE FROM booking_series WHERE id = ?', [seriesId]);
+
+            return res.status(409).json({
+                error: 'Booking conflicts detected',
+                message: `Cannot create series: ${conflicts.length} booking(s) would conflict with existing bookings`,
+                conflicts: conflicts.map(c => ({
+                    date: c.instance.booking_date,
+                    start_time: c.instance.start_time,
+                    end_time: c.instance.end_time,
+                    conflicting_booking: c.conflicting_bookings[0] ? {
+                        id: c.conflicting_bookings[0].id,
+                        specialty: c.conflicting_bookings[0].specialty,
+                        doctor_name: c.conflicting_bookings[0].doctor_name,
+                        room_name: c.conflicting_bookings[0].room_name
+                    } : null
+                }))
+            });
+        }
+
         // Insert only non-excluded instances
         const insertPromises = filteredInstances.map(instance =>
             db.run(`

@@ -52,6 +52,7 @@ function BookingForm() {
     is_under_4_weeks: false,
   });
   const [error, setError] = useState('');
+  const [conflictDetails, setConflictDetails] = useState(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
@@ -164,6 +165,7 @@ function BookingForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setConflictDetails(null);
     setLoading(true);
 
     try {
@@ -183,7 +185,13 @@ function BookingForm() {
         navigate('/bookings');
       }, 2000);
     } catch (error) {
-      setError(error.response?.data?.error || `Failed to ${isEditMode ? 'update' : 'create'} booking`);
+      const errorData = error.response?.data;
+      if (errorData?.conflicts) {
+        setError('Booking conflict detected - this time slot is already booked');
+        setConflictDetails(errorData.conflicts);
+      } else {
+        setError(errorData?.error || `Failed to ${isEditMode ? 'update' : 'create'} booking`);
+      }
     } finally {
       setLoading(false);
     }
@@ -415,7 +423,25 @@ function BookingForm() {
 
               {error && (
                 <Grid item xs={12}>
-                  <Alert severity="error">{error}</Alert>
+                  <Alert severity="error">
+                    <Typography variant="body1" sx={{ fontWeight: 'bold', mb: conflictDetails ? 1 : 0 }}>
+                      {error}
+                    </Typography>
+                    {conflictDetails && conflictDetails.length > 0 && (
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="body2">
+                          Existing booking details:
+                        </Typography>
+                        {conflictDetails.map((conflict, index) => (
+                          <Typography key={index} variant="body2" sx={{ ml: 2 }}>
+                            • {conflict.specialty || 'Booking'}
+                            {conflict.doctor_name && ` - ${conflict.doctor_name}`}
+                            {conflict.start_time && ` (${conflict.start_time} - ${conflict.end_time})`}
+                          </Typography>
+                        ))}
+                      </Box>
+                    )}
+                  </Alert>
                 </Grid>
               )}
 

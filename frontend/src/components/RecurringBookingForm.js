@@ -52,6 +52,7 @@ function RecurringBookingForm() {
   const [previewData, setPreviewData] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState('');
+  const [conflictDetails, setConflictDetails] = useState(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -150,6 +151,7 @@ function RecurringBookingForm() {
   const handleCreate = async (excludedDates = []) => {
     setLoading(true);
     setError('');
+    setConflictDetails(null);
 
     try {
       const seriesData = {
@@ -167,7 +169,14 @@ function RecurringBookingForm() {
         navigate('/bookings');
       }, 2000);
     } catch (error) {
-      setError(error.response?.data?.error || 'Failed to create booking series');
+      const errorData = error.response?.data;
+      if (errorData?.conflicts) {
+        setError(errorData.message || 'Booking conflicts detected');
+        setConflictDetails(errorData.conflicts);
+      } else {
+        setError(errorData?.error || 'Failed to create booking series');
+      }
+      setShowPreview(false);
     } finally {
       setLoading(false);
     }
@@ -385,7 +394,34 @@ function RecurringBookingForm() {
 
             {error && (
               <Grid item xs={12}>
-                <Alert severity="error">{error}</Alert>
+                <Alert severity="error">
+                  <Typography variant="body1" sx={{ fontWeight: 'bold', mb: conflictDetails ? 1 : 0 }}>
+                    {error}
+                  </Typography>
+                  {conflictDetails && conflictDetails.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        The following dates have existing bookings:
+                      </Typography>
+                      {conflictDetails.slice(0, 10).map((conflict, index) => (
+                        <Typography key={index} variant="body2" sx={{ ml: 2 }}>
+                          • {new Date(conflict.date).toLocaleDateString('en-GB')} ({conflict.start_time} - {conflict.end_time})
+                          {conflict.conflicting_booking && (
+                            <span>
+                              {' '}- {conflict.conflicting_booking.specialty || 'Booking'}
+                              {conflict.conflicting_booking.doctor_name && ` (${conflict.conflicting_booking.doctor_name})`}
+                            </span>
+                          )}
+                        </Typography>
+                      ))}
+                      {conflictDetails.length > 10 && (
+                        <Typography variant="body2" sx={{ ml: 2, fontStyle: 'italic' }}>
+                          ... and {conflictDetails.length - 10} more conflicts
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </Alert>
               </Grid>
             )}
 
