@@ -1,8 +1,16 @@
 import axios from 'axios';
 
+// In production (on Render), use relative path. In development, use localhost.
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? '/api/public'
+  : (process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/public` : 'http://localhost:5000/api/public');
+
 // Create a separate axios instance for public API calls (no auth token)
 const publicApi = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api/public',
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 export const getPublicBookings = async (params = {}) => {
