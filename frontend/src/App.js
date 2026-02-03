@@ -69,6 +69,7 @@ function App() {
         <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', p: 3 }}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/public-calendar" element={<CalendarView readOnly />} />
             <Route
               path="/"
               element={

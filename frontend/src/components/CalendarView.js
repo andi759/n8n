@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Card,
@@ -11,14 +12,22 @@ import {
   FormControlLabel,
   Checkbox,
   Paper,
+  Alert,
 } from '@mui/material';
 import {
   Today,
+  Login as LoginIcon,
 } from '@mui/icons-material';
 import { getAllBookings } from '../services/bookingService';
 import { getAllRooms } from '../services/roomService';
 import { getAllClinics } from '../services/clinicService';
 import { getAllSpecialties } from '../services/specialtyService';
+import {
+  getPublicBookings,
+  getPublicRooms,
+  getPublicClinics,
+  getPublicSpecialties,
+} from '../services/publicService';
 import {
   format,
   addDays,
@@ -54,7 +63,8 @@ const getSessionLabel = (session) => {
   }
 };
 
-function CalendarView() {
+function CalendarView({ readOnly = false }) {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('day');
   const [selectedRoomId, setSelectedRoomId] = useState('');
@@ -76,7 +86,7 @@ function CalendarView() {
     loadClinics();
     loadRooms();
     loadSpecialties();
-  }, []);
+  }, [readOnly]);
 
   useEffect(() => {
     loadBookings();
@@ -100,7 +110,7 @@ function CalendarView() {
 
   const loadClinics = async () => {
     try {
-      const data = await getAllClinics();
+      const data = readOnly ? await getPublicClinics() : await getAllClinics();
       setClinics(data);
     } catch (error) {
       console.error('Failed to load clinics:', error);
@@ -109,7 +119,7 @@ function CalendarView() {
 
   const loadRooms = async () => {
     try {
-      const data = await getAllRooms();
+      const data = readOnly ? await getPublicRooms() : await getAllRooms();
       setAllRooms(data);
       setRooms(data);
     } catch (error) {
@@ -119,7 +129,7 @@ function CalendarView() {
 
   const loadSpecialties = async () => {
     try {
-      const data = await getAllSpecialties();
+      const data = readOnly ? await getPublicSpecialties() : await getAllSpecialties();
       setSpecialties(data);
     } catch (error) {
       console.error('Failed to load specialties:', error);
@@ -158,7 +168,7 @@ function CalendarView() {
       if (filters.specialty) params.specialty = filters.specialty;
       if (!filters.includeCancelled) params.status = 'confirmed';
 
-      const data = await getAllBookings(params);
+      const data = readOnly ? await getPublicBookings(params) : await getAllBookings(params);
       setBookings(data);
     } catch (error) {
       console.error('Failed to load bookings:', error);
@@ -584,9 +594,27 @@ function CalendarView() {
 
   return (
     <Container maxWidth={false} sx={{ maxWidth: '100%' }}>
+      {readOnly && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              startIcon={<LoginIcon />}
+              onClick={() => navigate('/login')}
+            >
+              Login
+            </Button>
+          }
+        >
+          You are viewing the calendar in read-only mode. Login to make bookings or edits.
+        </Alert>
+      )}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          Calendar View
+          Calendar View {readOnly && <Typography component="span" variant="h6" color="text.secondary">(Read Only)</Typography>}
         </Typography>
       </Box>
 

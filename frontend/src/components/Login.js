@@ -8,7 +8,9 @@ import {
   Typography,
   Box,
   Alert,
+  Divider,
 } from '@mui/material';
+import { CalendarMonth } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
 function Login() {
@@ -83,6 +85,22 @@ function Login() {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+
+          <Divider sx={{ my: 3 }}>
+            <Typography variant="body2" color="text.secondary">
+              or
+            </Typography>
+          </Divider>
+
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            startIcon={<CalendarMonth />}
+            onClick={() => navigate('/public-calendar')}
+          >
+            View Calendar (Read Only)
+          </Button>
 
           <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
             <Typography variant="caption" display="block" gutterBottom>
