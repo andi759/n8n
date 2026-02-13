@@ -10,6 +10,7 @@ import {
 import RoomManagement from './admin/RoomManagement';
 import UserManagement from './admin/UserManagement';
 import SpecialtyManagement from './admin/SpecialtyManagement';
+import ClinicManagement from './admin/ClinicManagement';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -48,6 +49,7 @@ function AdminPage() {
           <Tab label="Room Management" />
           <Tab label="User Management" />
           <Tab label="Specialties" />
+          <Tab label="Clinics" />
         </Tabs>
 
         <TabPanel value={activeTab} index={0}>
@@ -60,6 +62,10 @@ function AdminPage() {
 
         <TabPanel value={activeTab} index={2}>
           <SpecialtyManagement />
+        </TabPanel>
+
+        <TabPanel value={activeTab} index={3}>
+          <ClinicManagement />
         </TabPanel>
       </Paper>
     </Container>
