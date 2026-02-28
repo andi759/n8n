@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 
 import { useAuth } from './context/AuthContext';
 import Login from './components/Login';
@@ -127,6 +128,21 @@ function App() {
               }
             />
           </Routes>
+        </Box>
+        <Box
+          component="footer"
+          sx={{
+            py: 1.5,
+            px: 2,
+            textAlign: 'center',
+            bgcolor: 'background.default',
+            borderTop: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            &copy; {new Date().getFullYear()} ART Digital Media. Used by Cambridge University Hospitals under licence.
+          </Typography>
         </Box>
       </Box>
     </ThemeProvider>

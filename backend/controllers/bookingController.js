@@ -147,70 +147,82 @@ async function createBooking(req, res) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Check for conflicts with non-cancelled bookings
-        const conflicts = await db.all(`
-            SELECT * FROM bookings
-            WHERE room_id = ?
-            AND booking_date = ?
-            AND status != 'cancelled'
-            AND (
-                (start_time < ? AND end_time > ?)
-                OR (start_time >= ? AND start_time < ?)
-            )
-        `, [room_id, booking_date, end_time, start_time, start_time, end_time]);
+        // Generate advisory lock key from room_id and booking_date
+        const dateHash = booking_date.split('-').join('') | 0; // e.g. 20260228
 
-        if (conflicts.length > 0) {
+        // Use a transaction with advisory lock to prevent race conditions
+        const result = await db.transaction(async (txDb) => {
+            // Check for conflicts with non-cancelled bookings
+            const conflicts = await txDb.all(`
+                SELECT * FROM bookings
+                WHERE room_id = ?
+                AND booking_date = ?
+                AND status != 'cancelled'
+                AND (
+                    (start_time < ? AND end_time > ?)
+                    OR (start_time >= ? AND start_time < ?)
+                )
+            `, [room_id, booking_date, end_time, start_time, start_time, end_time]);
+
+            if (conflicts.length > 0) {
+                return { conflict: true, conflicts };
+            }
+
+            // Check if there's a cancelled booking that overlaps with this slot (reallocation scenario)
+            const cancelledBooking = await txDb.get(`
+                SELECT * FROM bookings
+                WHERE room_id = ?
+                AND booking_date = ?
+                AND status = 'cancelled'
+                AND (
+                    (start_time <= ? AND end_time >= ?)
+                    OR (start_time >= ? AND start_time < ?)
+                    OR (start_time < ? AND end_time > ?)
+                )
+                ORDER BY updated_at DESC
+                LIMIT 1
+            `, [room_id, booking_date, start_time, start_time, start_time, end_time, end_time, end_time]);
+
+            // Prepare reallocation fields
+            let isReallocated = 0;
+            let previousBookingId = null;
+            let reallocatedBy = null;
+            let reallocatedAt = null;
+
+            if (cancelledBooking) {
+                isReallocated = 1;
+                previousBookingId = cancelledBooking.id;
+                reallocatedBy = req.user.id;
+                reallocatedAt = new Date().toISOString();
+            }
+
+            // Create booking
+            const insertResult = await txDb.run(`
+                INSERT INTO bookings (
+                    clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
+                    specialty, clinic_code, doctor_name, notes, color, created_by,
+                    is_reallocated, previous_booking_id, reallocated_by, reallocated_at,
+                    is_ad_hoc, is_room_swap, is_over_4_weeks, is_under_4_weeks
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session || 'all_day',
+                specialty, clinic_code, doctor_name, notes, color || '#1976d2', req.user.id,
+                isReallocated, previousBookingId, reallocatedBy, reallocatedAt,
+                is_ad_hoc ? 1 : 0, is_room_swap ? 1 : 0, is_over_4_weeks ? 1 : 0, is_under_4_weeks ? 1 : 0
+            ]);
+
+            const booking = await txDb.get('SELECT * FROM bookings WHERE id = ?', [insertResult.id]);
+            return { conflict: false, booking };
+        }, [room_id, dateHash]);
+
+        if (result.conflict) {
             return res.status(409).json({
                 error: 'Booking conflict detected',
-                conflicts
+                conflicts: result.conflicts
             });
         }
 
-        // Check if there's a cancelled booking that overlaps with this slot (reallocation scenario)
-        const cancelledBooking = await db.get(`
-            SELECT * FROM bookings
-            WHERE room_id = ?
-            AND booking_date = ?
-            AND status = 'cancelled'
-            AND (
-                (start_time <= ? AND end_time >= ?)
-                OR (start_time >= ? AND start_time < ?)
-                OR (start_time < ? AND end_time > ?)
-            )
-            ORDER BY updated_at DESC
-            LIMIT 1
-        `, [room_id, booking_date, start_time, start_time, start_time, end_time, end_time, end_time]);
-
-        // Prepare reallocation fields
-        let isReallocated = 0;
-        let previousBookingId = null;
-        let reallocatedBy = null;
-        let reallocatedAt = null;
-
-        if (cancelledBooking) {
-            isReallocated = 1;
-            previousBookingId = cancelledBooking.id;
-            reallocatedBy = req.user.id;
-            reallocatedAt = new Date().toISOString();
-        }
-
-        // Create booking
-        const result = await db.run(`
-            INSERT INTO bookings (
-                clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
-                specialty, clinic_code, doctor_name, notes, color, created_by,
-                is_reallocated, previous_booking_id, reallocated_by, reallocated_at,
-                is_ad_hoc, is_room_swap, is_over_4_weeks, is_under_4_weeks
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-            clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session || 'all_day',
-            specialty, clinic_code, doctor_name, notes, color || '#1976d2', req.user.id,
-            isReallocated, previousBookingId, reallocatedBy, reallocatedAt,
-            is_ad_hoc ? 1 : 0, is_room_swap ? 1 : 0, is_over_4_weeks ? 1 : 0, is_under_4_weeks ? 1 : 0
-        ]);
-
-        const booking = await db.get('SELECT * FROM bookings WHERE id = ?', [result.id]);
-        res.status(201).json(booking);
+        res.status(201).json(result.booking);
     } catch (error) {
         console.error('Create booking error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -244,9 +256,17 @@ async function updateBooking(req, res) {
             return res.status(404).json({ error: 'Booking not found' });
         }
 
-        // Check for conflicts (excluding current booking)
-        if (room_id && booking_date && start_time && end_time) {
-            const conflicts = await db.all(`
+        // Use the effective values (new or existing) for conflict check
+        const effectiveRoomId = room_id || existing.room_id;
+        const effectiveDate = booking_date || existing.booking_date;
+        const effectiveStart = start_time || existing.start_time;
+        const effectiveEnd = end_time || existing.end_time;
+
+        const dateHash = effectiveDate.split('-').join('') | 0;
+
+        const result = await db.transaction(async (txDb) => {
+            // Always check for conflicts when updating
+            const conflicts = await txDb.all(`
                 SELECT * FROM bookings
                 WHERE id != ?
                 AND room_id = ?
@@ -256,44 +276,50 @@ async function updateBooking(req, res) {
                     (start_time < ? AND end_time > ?)
                     OR (start_time >= ? AND start_time < ?)
                 )
-            `, [id, room_id, booking_date, end_time, start_time, start_time, end_time]);
+            `, [id, effectiveRoomId, effectiveDate, effectiveEnd, effectiveStart, effectiveStart, effectiveEnd]);
 
             if (conflicts.length > 0) {
-                return res.status(409).json({
-                    error: 'Booking conflict detected',
-                    conflicts
-                });
+                return { conflict: true, conflicts };
             }
+
+            // Mark as exception if part of a series
+            const isException = existing.series_id ? 1 : 0;
+
+            // Update booking
+            await txDb.run(`
+                UPDATE bookings SET
+                    clinic_id = COALESCE(?, clinic_id),
+                    room_id = COALESCE(?, room_id),
+                    booking_date = COALESCE(?, booking_date),
+                    start_time = COALESCE(?, start_time),
+                    end_time = COALESCE(?, end_time),
+                    duration_minutes = COALESCE(?, duration_minutes),
+                    specialty = COALESCE(?, specialty),
+                    clinic_code = COALESCE(?, clinic_code),
+                    doctor_name = COALESCE(?, doctor_name),
+                    notes = COALESCE(?, notes),
+                    status = COALESCE(?, status),
+                    color = COALESCE(?, color),
+                    is_exception = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `, [
+                clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
+                specialty, clinic_code, doctor_name, notes, status, color, isException, id
+            ]);
+
+            const booking = await txDb.get('SELECT * FROM bookings WHERE id = ?', [id]);
+            return { conflict: false, booking };
+        }, [effectiveRoomId, dateHash]);
+
+        if (result.conflict) {
+            return res.status(409).json({
+                error: 'Booking conflict detected',
+                conflicts: result.conflicts
+            });
         }
 
-        // Mark as exception if part of a series
-        const isException = existing.series_id ? 1 : 0;
-
-        // Update booking
-        await db.run(`
-            UPDATE bookings SET
-                clinic_id = COALESCE(?, clinic_id),
-                room_id = COALESCE(?, room_id),
-                booking_date = COALESCE(?, booking_date),
-                start_time = COALESCE(?, start_time),
-                end_time = COALESCE(?, end_time),
-                duration_minutes = COALESCE(?, duration_minutes),
-                specialty = COALESCE(?, specialty),
-                clinic_code = COALESCE(?, clinic_code),
-                doctor_name = COALESCE(?, doctor_name),
-                notes = COALESCE(?, notes),
-                status = COALESCE(?, status),
-                color = COALESCE(?, color),
-                is_exception = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `, [
-            clinic_id, room_id, booking_date, start_time, end_time, duration_minutes,
-            specialty, clinic_code, doctor_name, notes, status, color, isException, id
-        ]);
-
-        const booking = await db.get('SELECT * FROM bookings WHERE id = ?', [id]);
-        res.json(booking);
+        res.json(result.booking);
     } catch (error) {
         console.error('Update booking error:', error);
         res.status(500).json({ error: 'Server error' });

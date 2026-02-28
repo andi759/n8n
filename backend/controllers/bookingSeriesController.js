@@ -184,16 +184,39 @@ async function createSeries(req, res) {
         console.log('Total instances:', instances.length);
         console.log('Filtered instances (to be created):', filteredInstances.length);
 
-        // CRITICAL: Check for conflicts before inserting - this is the server-side safety check
-        const conflicts = await checkConflicts(filteredInstances, db);
-        if (conflicts.length > 0) {
-            // Delete the series we just created since we can't create the bookings
-            await db.run('DELETE FROM booking_series WHERE id = ?', [seriesId]);
+        // CRITICAL: Use transaction with advisory lock to check conflicts and insert atomically
+        const txResult = await db.transaction(async (txDb) => {
+            const conflicts = await checkConflicts(filteredInstances, txDb);
+            if (conflicts.length > 0) {
+                // Delete the series we just created since we can't create the bookings
+                await txDb.run('DELETE FROM booking_series WHERE id = ?', [seriesId]);
+                return { conflict: true, conflicts };
+            }
 
+            // Insert only non-excluded instances
+            for (const instance of filteredInstances) {
+                await txDb.run(`
+                    INSERT INTO bookings (
+                        series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
+                        specialty, clinic_code, doctor_name, notes, color, created_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    instance.series_id, instance.clinic_id, instance.room_id, instance.booking_date,
+                    instance.start_time, instance.end_time, instance.duration_minutes, instance.session || session || 'all_day',
+                    instance.specialty, instance.clinic_code, instance.doctor_name,
+                    instance.notes, instance.color || series.color || '#1976d2',
+                    instance.created_by
+                ]);
+            }
+
+            return { conflict: false };
+        }, [room_id, 0]);
+
+        if (txResult.conflict) {
             return res.status(409).json({
                 error: 'Booking conflicts detected',
-                message: `Cannot create series: ${conflicts.length} booking(s) would conflict with existing bookings`,
-                conflicts: conflicts.map(c => ({
+                message: `Cannot create series: ${txResult.conflicts.length} booking(s) would conflict with existing bookings`,
+                conflicts: txResult.conflicts.map(c => ({
                     date: c.instance.booking_date,
                     start_time: c.instance.start_time,
                     end_time: c.instance.end_time,
@@ -206,24 +229,6 @@ async function createSeries(req, res) {
                 }))
             });
         }
-
-        // Insert only non-excluded instances
-        const insertPromises = filteredInstances.map(instance =>
-            db.run(`
-                INSERT INTO bookings (
-                    series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
-                    specialty, clinic_code, doctor_name, notes, color, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                instance.series_id, instance.clinic_id, instance.room_id, instance.booking_date,
-                instance.start_time, instance.end_time, instance.duration_minutes, instance.session || session || 'all_day',
-                instance.specialty, instance.clinic_code, instance.doctor_name,
-                instance.notes, instance.color || series.color || '#1976d2',
-                instance.created_by
-            ])
-        );
-
-        await Promise.all(insertPromises);
 
         res.status(201).json({
             message: 'Series created successfully',
@@ -487,39 +492,40 @@ async function extendSeries(req, res) {
             instance => !excludedSet.has(String(instance.booking_date).substring(0, 10))
         );
 
-        // Check for conflicts with existing bookings
-        const conflicts = await checkConflicts(filteredInstances, db);
-        const conflictDates = new Set(conflicts.map(c => c.booking_date));
+        // Use transaction with advisory lock to check conflicts and insert atomically
+        const txResult = await db.transaction(async (txDb) => {
+            const conflicts = await checkConflicts(filteredInstances, txDb);
+            const conflictDates = new Set(conflicts.map(c => c.booking_date));
 
-        // Filter out conflicting dates
-        const instancesToCreate = filteredInstances.filter(
-            instance => !conflictDates.has(instance.booking_date)
-        );
+            // Filter out conflicting dates
+            const instancesToCreate = filteredInstances.filter(
+                instance => !conflictDates.has(instance.booking_date)
+            );
 
-        // Insert new booking instances
-        const insertPromises = instancesToCreate.map(instance =>
-            db.run(`
-                INSERT INTO bookings (
-                    series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
-                    specialty, clinic_code, doctor_name, notes, color, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                id, series.clinic_id, series.room_id, instance.booking_date,
-                series.start_time, series.end_time, series.duration_minutes, series.session || 'all_day',
-                series.specialty, series.clinic_code, series.doctor_name,
-                series.notes, series.color || '#1976d2',
-                req.user.id
-            ])
-        );
+            // Insert new booking instances sequentially within the transaction
+            for (const instance of instancesToCreate) {
+                await txDb.run(`
+                    INSERT INTO bookings (
+                        series_id, clinic_id, room_id, booking_date, start_time, end_time, duration_minutes, session,
+                        specialty, clinic_code, doctor_name, notes, color, created_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    id, series.clinic_id, series.room_id, instance.booking_date,
+                    series.start_time, series.end_time, series.duration_minutes, series.session || 'all_day',
+                    series.specialty, series.clinic_code, series.doctor_name,
+                    series.notes, series.color || '#1976d2',
+                    req.user.id
+                ]);
+            }
 
-        await Promise.all(insertPromises);
+            return { instances_added: instancesToCreate.length, conflicts_skipped: conflicts.length };
+        }, [series.room_id, 0]);
 
         res.json({
             message: 'Series extended successfully',
             new_end_date,
-            instances_added: instancesToCreate.length,
-            conflicts_skipped: conflicts.length,
-            excluded_skipped: filteredInstances.length - instancesToCreate.length - conflicts.length
+            instances_added: txResult.instances_added,
+            conflicts_skipped: txResult.conflicts_skipped
         });
     } catch (error) {
         console.error('Extend series error:', error);

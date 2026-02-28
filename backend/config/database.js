@@ -83,6 +83,52 @@ class Database {
         return sql.replace(/\?/g, () => `$${++index}`);
     }
 
+    // Run a callback inside a transaction with optional advisory lock
+    // advisoryLockKeys: array of two integers for pg_advisory_xact_lock (optional)
+    async transaction(callback, advisoryLockKeys = null) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            if (advisoryLockKeys) {
+                await client.query('SELECT pg_advisory_xact_lock($1, $2)', advisoryLockKeys);
+            }
+
+            const txDb = {
+                run: async (sql, params = []) => {
+                    let pgSql = this.convertPlaceholders(sql);
+                    if (sql.trim().toUpperCase().startsWith('INSERT') && !pgSql.toUpperCase().includes('RETURNING')) {
+                        pgSql = pgSql.replace(/;?\s*$/, ' RETURNING id');
+                    }
+                    const result = await client.query(pgSql, params);
+                    if (sql.trim().toUpperCase().startsWith('INSERT')) {
+                        return { id: result.rows[0]?.id || null, changes: result.rowCount };
+                    }
+                    return { changes: result.rowCount };
+                },
+                get: async (sql, params = []) => {
+                    const pgSql = this.convertPlaceholders(sql);
+                    const result = await client.query(pgSql, params);
+                    return result.rows[0] || null;
+                },
+                all: async (sql, params = []) => {
+                    const pgSql = this.convertPlaceholders(sql);
+                    const result = await client.query(pgSql, params);
+                    return result.rows;
+                }
+            };
+
+            const returnValue = await callback(txDb);
+            await client.query('COMMIT');
+            return returnValue;
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+
     // Close database connection
     async close() {
         await this.pool.end();

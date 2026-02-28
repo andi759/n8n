@@ -42,6 +42,14 @@ function Login() {
     <Container maxWidth="sm">
       <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <Box
+              component="img"
+              src="/nhs-logo.png"
+              alt="Cambridge University Hospitals NHS Foundation Trust"
+              sx={{ height: 60 }}
+            />
+          </Box>
           <Typography variant="h4" component="h1" gutterBottom align="center">
             Room Booking Service
           </Typography>

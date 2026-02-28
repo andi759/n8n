@@ -67,6 +67,12 @@ function Navigation() {
   return (
     <AppBar position="static">
       <Toolbar>
+        <Box
+          component="img"
+          src="/nhs-logo.png"
+          alt="Cambridge University Hospitals NHS Foundation Trust"
+          sx={{ height: 40, mr: 2 }}
+        />
         <Typography variant="h6" component="div" sx={{ flexGrow: 0, mr: 4 }}>
           Room Booking
         </Typography>
