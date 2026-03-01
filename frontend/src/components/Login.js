@@ -110,6 +110,17 @@ function Login() {
             View Calendar (Read Only)
           </Button>
 
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            color="error"
+            sx={{ mt: 1.5 }}
+            onClick={() => navigate('/wli-booking')}
+          >
+            Book WLI
+          </Button>
+
           <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
             <Typography variant="caption" display="block" gutterBottom>
               Default credentials:

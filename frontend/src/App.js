@@ -14,6 +14,7 @@ import RecurringBookingForm from './components/RecurringBookingForm';
 import BookingList from './components/BookingList';
 import CalendarView from './components/CalendarView';
 import AdminPage from './components/AdminPage';
+import WLIBookingForm from './components/WLIBookingForm';
 
 const theme = createTheme({
   palette: {
@@ -71,6 +72,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/public-calendar" element={<CalendarView readOnly />} />
+            <Route path="/wli-booking" element={<WLIBookingForm />} />
             <Route
               path="/"
               element={

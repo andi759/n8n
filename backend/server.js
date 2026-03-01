@@ -35,6 +35,7 @@ app.use('/api/rooms', require('./routes/rooms'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/specialties', require('./routes/specialties'));
 app.use('/api/public', require('./routes/public'));
+app.use('/api/wli', require('./routes/wli'));
 
 // TEMPORARY: Create first admin user (REMOVE AFTER USING)
 app.get('/api/create-first-admin', async (req, res) => {

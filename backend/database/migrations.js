@@ -153,6 +153,35 @@ async function runMigrations() {
             console.error('Migration error (specialties):', err.message);
         }
 
+        // Create wli_requests table
+        try {
+            await db.exec(`
+                CREATE TABLE IF NOT EXISTS wli_requests (
+                    id SERIAL PRIMARY KEY,
+                    requester_name VARCHAR(255) NOT NULL,
+                    contact_email VARCHAR(255) NOT NULL,
+                    division VARCHAR(10) NOT NULL,
+                    specialty VARCHAR(255) NOT NULL,
+                    specialty_other VARCHAR(255),
+                    wli_date DATE NOT NULL,
+                    wli_time VARCHAR(10) NOT NULL,
+                    preferred_location VARCHAR(255),
+                    num_patients INTEGER,
+                    num_clock_stops INTEGER,
+                    requirements TEXT,
+                    requirements_other TEXT,
+                    director_approved VARCHAR(255),
+                    status VARCHAR(50) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            migrations.push('Checked wli_requests table');
+        } catch (err) {
+            if (!err.message.includes('already exists')) {
+                console.error('Migration error (wli_requests):', err.message);
+            }
+        }
+
         if (migrations.length > 0) {
             console.log('Migrations completed:', migrations);
         } else {
