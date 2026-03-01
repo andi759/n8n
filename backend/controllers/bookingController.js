@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { sendWeekendBookingAlert, isWeekend } = require('../services/emailService');
 
 /**
  * Get all bookings with filters
@@ -219,6 +220,19 @@ async function createBooking(req, res) {
             return res.status(409).json({
                 error: 'Booking conflict detected',
                 conflicts: result.conflicts
+            });
+        }
+
+        // Send weekend alert email (non-blocking)
+        if (isWeekend(booking_date)) {
+            const room = await db.get('SELECT room_name FROM rooms WHERE id = ?', [room_id]);
+            const clinic = await db.get('SELECT clinic_name FROM clinics WHERE id = ?', [clinic_id]);
+            const user = await db.get('SELECT full_name FROM users WHERE id = ?', [req.user.id]);
+            sendWeekendBookingAlert({
+                booking: result.booking,
+                roomName: room?.room_name,
+                clinicName: clinic?.clinic_name,
+                bookedBy: user?.full_name,
             });
         }
 
