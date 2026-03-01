@@ -40,7 +40,8 @@ function WLIBookingForm() {
         specialty: '',
         specialty_other: '',
         wli_date: '',
-        wli_time: '',
+        wli_start_time: '',
+        wli_end_time: '',
         preferred_location: '',
         num_patients: '',
         num_clock_stops: '',
@@ -193,7 +194,7 @@ function WLIBookingForm() {
                             />
                         )}
 
-                        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, mb: 2 }}>
+                        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, mb: 2 }}>
                             <TextField
                                 label="Date of WLI"
                                 type="date"
@@ -204,10 +205,19 @@ function WLIBookingForm() {
                                 InputLabelProps={{ shrink: true }}
                             />
                             <TextField
-                                label="Time of WLI"
+                                label="Start Time"
                                 type="time"
-                                value={formData.wli_time}
-                                onChange={handleChange('wli_time')}
+                                value={formData.wli_start_time}
+                                onChange={handleChange('wli_start_time')}
+                                required
+                                fullWidth
+                                InputLabelProps={{ shrink: true }}
+                            />
+                            <TextField
+                                label="End Time"
+                                type="time"
+                                value={formData.wli_end_time}
+                                onChange={handleChange('wli_end_time')}
                                 required
                                 fullWidth
                                 InputLabelProps={{ shrink: true }}

@@ -10,7 +10,8 @@ async function createWLIRequest(req, res) {
             specialty,
             specialty_other,
             wli_date,
-            wli_time,
+            wli_start_time,
+            wli_end_time,
             preferred_location,
             num_patients,
             num_clock_stops,
@@ -20,7 +21,7 @@ async function createWLIRequest(req, res) {
         } = req.body;
 
         // Validate required fields
-        if (!requester_name || !contact_email || !division || !specialty || !wli_date || !wli_time) {
+        if (!requester_name || !contact_email || !division || !specialty || !wli_date || !wli_start_time || !wli_end_time) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
@@ -30,12 +31,12 @@ async function createWLIRequest(req, res) {
         const result = await db.run(`
             INSERT INTO wli_requests (
                 requester_name, contact_email, division, specialty, specialty_other,
-                wli_date, wli_time, preferred_location, num_patients, num_clock_stops,
+                wli_date, wli_start_time, wli_end_time, preferred_location, num_patients, num_clock_stops,
                 requirements, requirements_other, director_approved
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         `, [
             requester_name, contact_email, division, specialty, specialty_other || null,
-            wli_date, wli_time, preferred_location || null, num_patients || null, num_clock_stops || null,
+            wli_date, wli_start_time, wli_end_time, preferred_location || null, num_patients || null, num_clock_stops || null,
             requirementsStr || null, requirements_other || null, director_approved || null,
         ]);
 

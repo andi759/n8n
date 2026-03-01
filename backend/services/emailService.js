@@ -89,7 +89,7 @@ async function sendWLIConfirmation(wli) {
             <p><strong>Your request details:</strong></p>
             <table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
                 <tr><td style="padding:6px 12px;font-weight:bold;">Date</td><td style="padding:6px 12px;">${formattedDate}</td></tr>
-                <tr style="background:#f5f5f5"><td style="padding:6px 12px;font-weight:bold;">Time</td><td style="padding:6px 12px;">${wli.wli_time}</td></tr>
+                <tr style="background:#f5f5f5"><td style="padding:6px 12px;font-weight:bold;">Time</td><td style="padding:6px 12px;">${wli.wli_start_time} – ${wli.wli_end_time}</td></tr>
                 <tr><td style="padding:6px 12px;font-weight:bold;">Division</td><td style="padding:6px 12px;">Division ${wli.division}</td></tr>
                 <tr style="background:#f5f5f5"><td style="padding:6px 12px;font-weight:bold;">Specialty</td><td style="padding:6px 12px;">${specialty}</td></tr>
                 <tr><td style="padding:6px 12px;font-weight:bold;">Preferred Location</td><td style="padding:6px 12px;">${wli.preferred_location || '–'}</td></tr>
