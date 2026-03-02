@@ -114,8 +114,22 @@ async function sendWLIConfirmation(wli) {
 }
 
 async function sendWLINotification(wli) {
-    const recipients = process.env.WLI_ALERT_EMAILS;
-    if (!recipients) return;
+    const baseRecipients = process.env.WLI_ALERT_EMAILS;
+    if (!baseRecipients) return;
+
+    // Build recipient list based on requirements
+    let allRecipients = baseRecipients.split(',').map(e => e.trim());
+    let requirements = [];
+    try { requirements = JSON.parse(wli.requirements || '[]'); } catch (e) {}
+
+    if (requirements.includes('Imaging') && process.env.WLI_IMAGING_EMAILS) {
+        allRecipients = allRecipients.concat(process.env.WLI_IMAGING_EMAILS.split(',').map(e => e.trim()));
+    }
+    if (requirements.includes('Nursing Support') && process.env.WLI_NURSING_EMAILS) {
+        allRecipients = allRecipients.concat(process.env.WLI_NURSING_EMAILS.split(',').map(e => e.trim()));
+    }
+    const recipients = [...new Set(allRecipients)].join(',');
+
     const { formattedDate, specialty, requirementsList } = formatWLIDetails(wli);
     const mailOptions = {
         from: FROM_ADDRESS,
