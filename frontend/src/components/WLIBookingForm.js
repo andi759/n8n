@@ -23,7 +23,7 @@ import axios from 'axios';
 import { submitWLIRequest } from '../services/wliService';
 
 const DIVISIONS = ['A', 'B', 'C', 'D', 'E'];
-const REQUIREMENTS = ['Imaging', 'Nursing Support', 'Specific Equipment', 'Other'];
+const REQUIREMENTS = ['Imaging', 'Nursing Support', 'Reception cover', 'Specific Equipment', 'Other'];
 const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
 
 function WLIBookingForm() {
@@ -65,15 +65,10 @@ function WLIBookingForm() {
     const handleRequirementToggle = (req) => {
         setFormData(prev => {
             const current = prev.requirements;
-            if (current.includes(req)) {
-                let updated = current.filter(r => r !== req);
-                if (req === 'Nursing Support') {
-                    updated = updated.filter(r => r !== 'Reception cover');
-                }
-                return { ...prev, requirements: updated };
-            } else {
-                return { ...prev, requirements: [...current, req] };
-            }
+            const updated = current.includes(req)
+                ? current.filter(r => r !== req)
+                : [...current, req];
+            return { ...prev, requirements: updated };
         });
     };
 
@@ -283,6 +278,7 @@ function WLIBookingForm() {
                             {REQUIREMENTS.map(req => (
                                 <React.Fragment key={req}>
                                     <FormControlLabel
+                                        sx={req === 'Reception cover' ? { ml: 4 } : {}}
                                         control={
                                             <Checkbox
                                                 checked={formData.requirements.includes(req)}
@@ -291,18 +287,6 @@ function WLIBookingForm() {
                                         }
                                         label={req}
                                     />
-                                    {req === 'Nursing Support' && formData.requirements.includes('Nursing Support') && (
-                                        <FormControlLabel
-                                            sx={{ ml: 4 }}
-                                            control={
-                                                <Checkbox
-                                                    checked={formData.requirements.includes('Reception cover')}
-                                                    onChange={() => handleRequirementToggle('Reception cover')}
-                                                />
-                                            }
-                                            label="Reception cover"
-                                        />
-                                    )}
                                     {req === 'Specific Equipment' && formData.requirements.includes('Specific Equipment') && (
                                         <TextField
                                             label="Please describe specific equipment needed"
