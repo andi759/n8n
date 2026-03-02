@@ -9,6 +9,7 @@ async function createWLIRequest(req, res) {
             division,
             specialty,
             specialty_other,
+            clinic_code,
             wli_date,
             wli_start_time,
             wli_end_time,
@@ -17,6 +18,7 @@ async function createWLIRequest(req, res) {
             num_clock_stops,
             requirements,
             requirements_other,
+            requirements_equipment,
             director_approved,
         } = req.body;
 
@@ -30,14 +32,14 @@ async function createWLIRequest(req, res) {
 
         const result = await db.run(`
             INSERT INTO wli_requests (
-                requester_name, contact_email, division, specialty, specialty_other,
+                requester_name, contact_email, division, specialty, specialty_other, clinic_code,
                 wli_date, wli_start_time, wli_end_time, preferred_location, num_patients, num_clock_stops,
-                requirements, requirements_other, director_approved
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                requirements, requirements_other, requirements_equipment, director_approved
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         `, [
-            requester_name, contact_email, division, specialty, specialty_other || null,
+            requester_name, contact_email, division, specialty, specialty_other || null, clinic_code || null,
             wli_date, wli_start_time, wli_end_time, preferred_location || null, num_patients || null, num_clock_stops || null,
-            requirementsStr || null, requirements_other || null, director_approved || null,
+            requirementsStr || null, requirements_other || null, requirements_equipment || null, director_approved || null,
         ]);
 
         const wliRequest = await db.get('SELECT * FROM wli_requests WHERE id = $1', [result.id]);

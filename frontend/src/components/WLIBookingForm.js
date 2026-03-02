@@ -47,6 +47,8 @@ function WLIBookingForm() {
         num_clock_stops: '',
         requirements: [],
         requirements_other: '',
+        requirements_equipment: '',
+        clinic_code: '',
         director_approved: '',
     });
 
@@ -63,10 +65,15 @@ function WLIBookingForm() {
     const handleRequirementToggle = (req) => {
         setFormData(prev => {
             const current = prev.requirements;
-            const updated = current.includes(req)
-                ? current.filter(r => r !== req)
-                : [...current, req];
-            return { ...prev, requirements: updated };
+            if (current.includes(req)) {
+                let updated = current.filter(r => r !== req);
+                if (req === 'Nursing Support') {
+                    updated = updated.filter(r => r !== 'Reception cover');
+                }
+                return { ...prev, requirements: updated };
+            } else {
+                return { ...prev, requirements: [...current, req] };
+            }
         });
     };
 
@@ -194,6 +201,14 @@ function WLIBookingForm() {
                             />
                         )}
 
+                        <TextField
+                            label="Clinic Code"
+                            value={formData.clinic_code}
+                            onChange={handleChange('clinic_code')}
+                            fullWidth
+                            sx={{ mb: 2 }}
+                        />
+
                         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, mb: 2 }}>
                             <TextField
                                 label="Date of WLI"
@@ -266,16 +281,40 @@ function WLIBookingForm() {
                         </Typography>
                         <FormGroup sx={{ mb: 1 }}>
                             {REQUIREMENTS.map(req => (
-                                <FormControlLabel
-                                    key={req}
-                                    control={
-                                        <Checkbox
-                                            checked={formData.requirements.includes(req)}
-                                            onChange={() => handleRequirementToggle(req)}
+                                <React.Fragment key={req}>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={formData.requirements.includes(req)}
+                                                onChange={() => handleRequirementToggle(req)}
+                                            />
+                                        }
+                                        label={req}
+                                    />
+                                    {req === 'Nursing Support' && formData.requirements.includes('Nursing Support') && (
+                                        <FormControlLabel
+                                            sx={{ ml: 4 }}
+                                            control={
+                                                <Checkbox
+                                                    checked={formData.requirements.includes('Reception cover')}
+                                                    onChange={() => handleRequirementToggle('Reception cover')}
+                                                />
+                                            }
+                                            label="Reception cover"
                                         />
-                                    }
-                                    label={req}
-                                />
+                                    )}
+                                    {req === 'Specific Equipment' && formData.requirements.includes('Specific Equipment') && (
+                                        <TextField
+                                            label="Please describe specific equipment needed"
+                                            value={formData.requirements_equipment}
+                                            onChange={handleChange('requirements_equipment')}
+                                            fullWidth
+                                            multiline
+                                            rows={2}
+                                            sx={{ mb: 2, ml: 4 }}
+                                        />
+                                    )}
+                                </React.Fragment>
                             ))}
                         </FormGroup>
 
