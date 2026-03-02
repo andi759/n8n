@@ -121,17 +121,6 @@ function Login() {
             Book WLI
           </Button>
 
-          <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-            <Typography variant="caption" display="block" gutterBottom>
-              Default credentials:
-            </Typography>
-            <Typography variant="caption" display="block">
-              Admin: admin / admin123
-            </Typography>
-            <Typography variant="caption" display="block">
-              Staff: staff / staff123
-            </Typography>
-          </Box>
         </Paper>
       </Box>
     </Container>

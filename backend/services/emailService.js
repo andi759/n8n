@@ -1,12 +1,14 @@
 const nodemailer = require('nodemailer');
 
+const FROM_ADDRESS = '"NHS Room Booking" <no-reply@nhsroombooking.co.uk>';
+
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
+    host: 'smtp-relay.brevo.com',
     port: 587,
     secure: false,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
+        user: process.env.BREVO_SMTP_LOGIN,
+        pass: process.env.BREVO_SMTP_KEY,
     },
 });
 
@@ -25,7 +27,7 @@ async function sendWeekendBookingAlert({ booking, roomName, clinicName, bookedBy
                          'All Day (08:30–17:30)';
 
     const mailOptions = {
-        from: `"Room Booking System" <${process.env.EMAIL_USER}>`,
+        from: FROM_ADDRESS,
         to: recipients,
         subject: `Weekend Booking Alert – ${dayName} ${formattedDate}`,
         html: `
@@ -77,10 +79,10 @@ function formatWLIDetails(wli) {
 }
 
 async function sendWLIConfirmation(wli) {
-    if (!process.env.EMAIL_USER) return;
+    if (!process.env.BREVO_SMTP_KEY) return;
     const { formattedDate, specialty, requirementsList } = formatWLIDetails(wli);
     const mailOptions = {
-        from: `"Room Booking System" <${process.env.EMAIL_USER}>`,
+        from: FROM_ADDRESS,
         to: wli.contact_email,
         subject: `WLI Request Received – ${formattedDate}`,
         html: `
@@ -116,7 +118,7 @@ async function sendWLINotification(wli) {
     if (!recipients) return;
     const { formattedDate, specialty, requirementsList } = formatWLIDetails(wli);
     const mailOptions = {
-        from: `"Room Booking System" <${process.env.EMAIL_USER}>`,
+        from: FROM_ADDRESS,
         to: recipients,
         subject: `New WLI Request – Division ${wli.division} – ${formattedDate}`,
         html: `
@@ -124,7 +126,7 @@ async function sendWLINotification(wli) {
             <table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
                 <tr><td style="padding:6px 12px;font-weight:bold;">Requested by</td><td style="padding:6px 12px;">${wli.requester_name} (${wli.contact_email})</td></tr>
                 <tr style="background:#f5f5f5"><td style="padding:6px 12px;font-weight:bold;">Date</td><td style="padding:6px 12px;">${formattedDate}</td></tr>
-                <tr><td style="padding:6px 12px;font-weight:bold;">Time</td><td style="padding:6px 12px;">${wli.wli_time}</td></tr>
+                <tr><td style="padding:6px 12px;font-weight:bold;">Time</td><td style="padding:6px 12px;">${wli.wli_start_time} – ${wli.wli_end_time}</td></tr>
                 <tr style="background:#f5f5f5"><td style="padding:6px 12px;font-weight:bold;">Division</td><td style="padding:6px 12px;">Division ${wli.division}</td></tr>
                 <tr><td style="padding:6px 12px;font-weight:bold;">Specialty</td><td style="padding:6px 12px;">${specialty}</td></tr>
                 <tr style="background:#f5f5f5"><td style="padding:6px 12px;font-weight:bold;">Preferred Location</td><td style="padding:6px 12px;">${wli.preferred_location || '–'} <em style="color:#888">(not guaranteed)</em></td></tr>
