@@ -278,7 +278,7 @@ function WLIBookingForm() {
                             {REQUIREMENTS.map(req => (
                                 <React.Fragment key={req}>
                                     <FormControlLabel
-                                        sx={req === 'Reception cover' ? { ml: 4 } : {}}
+                                        sx={{}}
                                         control={
                                             <Checkbox
                                                 checked={formData.requirements.includes(req)}
