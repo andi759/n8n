@@ -76,11 +76,18 @@ async function previewSeries(req, res) {
     try {
         const seriesData = req.body;
 
+        // Derive start/end times from session so conflict check has valid time values
+        const { start_time, end_time, duration_minutes } = getTimesFromSession(seriesData.session);
+
         // Calculate preview range (default to series range or next 3 months)
         const rangeStart = seriesData.series_start_date;
         const rangeEnd = seriesData.series_end_date || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        const instances = previewBookingInstances(seriesData, rangeStart, rangeEnd);
+        const instances = previewBookingInstances(
+            { ...seriesData, start_time, end_time, duration_minutes },
+            rangeStart,
+            rangeEnd
+        );
 
         // Check for conflicts
         const conflicts = await checkConflicts(instances, db);

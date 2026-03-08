@@ -5,28 +5,24 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Typography,
   Box,
   Alert,
   Chip,
   CircularProgress,
-  Checkbox,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
 } from '@mui/material';
-import { Warning, CheckCircle } from '@mui/icons-material';
+import { Warning, CheckCircle, Block } from '@mui/icons-material';
 import { format } from 'date-fns';
 
 function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
   const [excludedDates, setExcludedDates] = useState(new Set());
 
-  // Reset excluded dates when preview data changes
   useEffect(() => {
     if (previewData?.conflicts) {
-      // Auto-exclude conflicting dates
       const conflictDates = new Set(
         previewData.conflicts.map(c => c.instance.booking_date)
       );
@@ -37,189 +33,138 @@ function SeriesPreview({ open, onClose, previewData, onConfirm, loading }) {
   if (!previewData) return null;
 
   const { instances, conflicts, total_count, conflict_count } = previewData;
-
   const hasConflicts = conflict_count > 0;
 
-  // Calculate how many will actually be booked
-  const bookableCount = instances.filter(
-    inst => !excludedDates.has(inst.booking_date)
-  ).length;
+  const conflictDateSet = new Set(conflicts.map(c => c.instance.booking_date));
 
-  const toggleDateExclusion = (date) => {
-    const newExcluded = new Set(excludedDates);
-    if (newExcluded.has(date)) {
-      newExcluded.delete(date);
-    } else {
-      newExcluded.add(date);
-    }
-    setExcludedDates(newExcluded);
-  };
+  const availableInstances = instances.filter(inst => !conflictDateSet.has(inst.booking_date));
+  const bookableCount = availableInstances.length;
 
   const handleConfirm = () => {
-    // Pass the list of dates to exclude to the parent
     onConfirm(Array.from(excludedDates));
   };
 
-  const isConflicting = (date) => {
-    return conflicts.some(c => c.instance.booking_date === date);
+  const formatBookingDate = (dateStr) => {
+    try {
+      const d = new Date(dateStr);
+      return format(d, 'EEE dd MMM yyyy');
+    } catch {
+      return dateStr;
+    }
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        Preview Recurring Booking Instances
+        Recurring Booking — Availability Check
       </DialogTitle>
 
       <DialogContent>
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="body1" gutterBottom>
-            <strong>{total_count}</strong> booking instances generated
-          </Typography>
-
-          {hasConflicts ? (
-            <Alert severity="warning" icon={<Warning />} sx={{ mt: 2 }}>
-              <strong>{conflict_count} conflicts detected!</strong>
-              <br />
-              Conflicting dates are automatically excluded. You can proceed with the {bookableCount} available slots,
-              or uncheck dates you want to skip.
-            </Alert>
-          ) : (
-            <Alert severity="success" icon={<CheckCircle />} sx={{ mt: 2 }}>
-              No conflicts detected. All time slots are available.
-            </Alert>
-          )}
-
-          {bookableCount < total_count && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              <strong>{bookableCount}</strong> of {total_count} bookings will be created
-              ({total_count - bookableCount} excluded)
-            </Alert>
-          )}
-        </Box>
-
-        <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">Include</TableCell>
-                <TableCell>#</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Day</TableCell>
-                <TableCell>Time</TableCell>
-                <TableCell>Status</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {instances.slice(0, 50).map((instance, index) => {
-                const instanceDate = new Date(instance.booking_date);
-                const dayName = format(instanceDate, 'EEEE');
-                const formattedDate = format(instanceDate, 'MMM dd, yyyy');
-                const hasConflict = isConflicting(instance.booking_date);
-                const isExcluded = excludedDates.has(instance.booking_date);
-
-                return (
-                  <TableRow
-                    key={index}
-                    sx={{
-                      bgcolor: hasConflict
-                        ? 'error.light'
-                        : isExcluded
-                          ? 'action.disabledBackground'
-                          : 'transparent',
-                      opacity: isExcluded ? 0.6 : 1,
-                    }}
-                  >
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={!isExcluded}
-                        onChange={() => toggleDateExclusion(instance.booking_date)}
-                        disabled={hasConflict}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{formattedDate}</TableCell>
-                    <TableCell>{dayName}</TableCell>
-                    <TableCell>
-                      {instance.start_time} - {instance.end_time}
-                    </TableCell>
-                    <TableCell>
-                      {hasConflict ? (
-                        <Chip
-                          label="Conflict - Skipped"
-                          color="error"
-                          size="small"
-                          icon={<Warning />}
-                        />
-                      ) : isExcluded ? (
-                        <Chip
-                          label="Excluded"
-                          color="default"
-                          size="small"
-                        />
-                      ) : (
-                        <Chip
-                          label="Will Book"
-                          color="success"
-                          size="small"
-                        />
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-
-          {instances.length > 50 && (
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center' }}>
-              Showing first 50 of {total_count} instances
-            </Typography>
-          )}
-        </Box>
-
-        {hasConflicts && (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="subtitle2" color="error" gutterBottom>
-              Conflict Details:
-            </Typography>
-            {conflicts.slice(0, 5).map((conflict, index) => (
-              <Alert severity="warning" key={index} sx={{ mt: 1 }}>
-                {format(new Date(conflict.instance.booking_date), 'MMM dd, yyyy')} at{' '}
-                {conflict.instance.start_time} - Already booked
-                {conflict.conflicting_bookings?.[0]?.room_name && (
-                  <> in {conflict.conflicting_bookings[0].room_name}</>
-                )}
-              </Alert>
-            ))}
-            {conflicts.length > 5 && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                ... and {conflicts.length - 5} more conflicts
-              </Typography>
-            )}
-          </Box>
+        {hasConflicts ? (
+          <Alert severity="warning" icon={<Warning />} sx={{ mb: 3 }}>
+            <strong>{conflict_count} date{conflict_count > 1 ? 's are' : ' is'} already booked</strong> and cannot be included.
+            {bookableCount > 0
+              ? ` You can proceed with the ${bookableCount} available slot${bookableCount > 1 ? 's' : ''}.`
+              : ' There are no available slots to book.'}
+          </Alert>
+        ) : (
+          <Alert severity="success" icon={<CheckCircle />} sx={{ mb: 3 }}>
+            All {total_count} slots are available — no conflicts detected.
+          </Alert>
         )}
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: hasConflicts ? '1fr 1fr' : '1fr', gap: 2 }}>
+          {/* Available dates */}
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <CheckCircle color="success" fontSize="small" />
+              <Typography variant="subtitle2" color="success.main">
+                Will be booked ({bookableCount})
+              </Typography>
+            </Box>
+            <Box sx={{ border: '1px solid', borderColor: 'success.light', borderRadius: 1, maxHeight: 300, overflow: 'auto' }}>
+              {availableInstances.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                  No available slots
+                </Typography>
+              ) : (
+                <List dense disablePadding>
+                  {availableInstances.map((inst, index) => (
+                    <React.Fragment key={inst.booking_date}>
+                      {index > 0 && <Divider />}
+                      <ListItem sx={{ py: 0.5 }}>
+                        <ListItemText
+                          primary={formatBookingDate(inst.booking_date)}
+                          secondary={`${inst.start_time} – ${inst.end_time}`}
+                          primaryTypographyProps={{ variant: 'body2' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip label="Available" color="success" size="small" />
+                      </ListItem>
+                    </React.Fragment>
+                  ))}
+                </List>
+              )}
+            </Box>
+          </Box>
+
+          {/* Conflicting dates */}
+          {hasConflicts && (
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Block color="error" fontSize="small" />
+                <Typography variant="subtitle2" color="error.main">
+                  Already taken ({conflict_count})
+                </Typography>
+              </Box>
+              <Box sx={{ border: '1px solid', borderColor: 'error.light', borderRadius: 1, maxHeight: 300, overflow: 'auto' }}>
+                <List dense disablePadding>
+                  {conflicts.map((conflict, index) => {
+                    const existing = conflict.conflicting_bookings?.[0];
+                    return (
+                      <React.Fragment key={conflict.instance.booking_date}>
+                        {index > 0 && <Divider />}
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemText
+                            primary={formatBookingDate(conflict.instance.booking_date)}
+                            secondary={
+                              existing
+                                ? `${existing.specialty || 'Existing booking'}${existing.doctor_name ? ` — ${existing.doctor_name}` : ''}`
+                                : 'Existing booking'
+                            }
+                            primaryTypographyProps={{ variant: 'body2' }}
+                            secondaryTypographyProps={{ variant: 'caption' }}
+                          />
+                          <Chip label="Taken" color="error" size="small" icon={<Block />} />
+                        </ListItem>
+                      </React.Fragment>
+                    );
+                  })}
+                </List>
+              </Box>
+            </Box>
+          )}
+        </Box>
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={loading}>
-          Cancel
+        <Button onClick={onClose} disabled={loading} variant="outlined" color="inherit">
+          {hasConflicts ? "Don't Book Any" : 'Cancel'}
         </Button>
-        <Box>
-          <Button
-            onClick={handleConfirm}
-            variant="contained"
-            disabled={loading || bookableCount === 0}
-            startIcon={loading && <CircularProgress size={20} />}
-          >
-            {loading
-              ? 'Creating...'
-              : bookableCount === total_count
-                ? `Create All ${total_count} Bookings`
-                : `Create ${bookableCount} Bookings (Skip ${total_count - bookableCount})`
-            }
-          </Button>
-        </Box>
+        <Button
+          onClick={handleConfirm}
+          variant="contained"
+          disabled={loading || bookableCount === 0}
+          startIcon={loading && <CircularProgress size={20} />}
+          color={hasConflicts ? 'warning' : 'primary'}
+        >
+          {loading
+            ? 'Creating...'
+            : hasConflicts
+              ? `Book Available Slots Only (${bookableCount})`
+              : `Create All ${total_count} Bookings`
+          }
+        </Button>
       </DialogActions>
     </Dialog>
   );
