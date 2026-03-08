@@ -170,7 +170,7 @@ function RecurringBookingForm() {
         inst => !excludedDates.includes(inst.booking_date)
       )?.booking_date || seriesData.series_start_date;
       setTimeout(() => {
-        navigate(`/?date=${firstDate}`);
+        navigate(`/calendar?date=${firstDate}`);
       }, 1500);
     } catch (error) {
       const errorData = error.response?.data;

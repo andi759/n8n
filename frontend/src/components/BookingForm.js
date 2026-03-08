@@ -184,7 +184,7 @@ function BookingForm() {
         await createBooking(bookingData);
         setSuccess(true);
         setTimeout(() => {
-          navigate(`/?date=${bookingData.booking_date}`);
+          navigate(`/calendar?date=${bookingData.booking_date}`);
         }, 1500);
       }
     } catch (error) {
