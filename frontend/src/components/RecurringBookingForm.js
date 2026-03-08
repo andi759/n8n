@@ -165,9 +165,13 @@ function RecurringBookingForm() {
       setShowPreview(false);
       setSuccess(true);
 
+      // Navigate to calendar showing the first booked instance
+      const firstDate = previewData?.instances?.find(
+        inst => !excludedDates.includes(inst.booking_date)
+      )?.booking_date || seriesData.series_start_date;
       setTimeout(() => {
-        navigate('/bookings');
-      }, 2000);
+        navigate(`/?date=${firstDate}`);
+      }, 1500);
     } catch (error) {
       const errorData = error.response?.data;
       if (errorData?.conflicts) {

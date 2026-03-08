@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Container,
   Card,
@@ -65,7 +65,15 @@ const getSessionLabel = (session) => {
 
 function CalendarView({ readOnly = false }) {
   const navigate = useNavigate();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [currentDate, setCurrentDate] = useState(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      const parsed = new Date(dateParam);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return new Date();
+  });
   const [viewMode, setViewMode] = useState('day');
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [bookings, setBookings] = useState([]);
@@ -86,6 +94,10 @@ function CalendarView({ readOnly = false }) {
     loadClinics();
     loadRooms();
     loadSpecialties();
+    // Clear date param from URL after using it to set initial date
+    if (searchParams.get('date')) {
+      setSearchParams({}, { replace: true });
+    }
   }, [readOnly]);
 
   useEffect(() => {

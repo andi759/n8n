@@ -176,14 +176,17 @@ function BookingForm() {
 
       if (isEditMode) {
         await updateBooking(id, bookingData);
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/bookings');
+        }, 2000);
       } else {
         await createBooking(bookingData);
+        setSuccess(true);
+        setTimeout(() => {
+          navigate(`/?date=${bookingData.booking_date}`);
+        }, 1500);
       }
-      setSuccess(true);
-
-      setTimeout(() => {
-        navigate('/bookings');
-      }, 2000);
     } catch (error) {
       const errorData = error.response?.data;
       if (errorData?.conflicts) {
